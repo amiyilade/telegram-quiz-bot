@@ -69,12 +69,16 @@ async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Only the host can stop the quiz.")
         return
 
-    # Cancel any running timer
+    # Cancel any running timers
     if mcq_timer_task and not mcq_timer_task.done():
         mcq_timer_task.cancel()
+    
+    if context.user_data.get("paragraph_timer_task") and not context.user_data["paragraph_timer_task"].done():
+        context.user_data["paragraph_timer_task"].cancel()
 
     in_progress = False
     waiting_for_mcq_answer = False
+    context.user_data.clear()  # Clear all user data
     active_players.clear()
     player_scores.clear()
     answered_questions.clear()
@@ -122,8 +126,20 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # Handle paragraph answers
-    if context.user_data.get("manual_review") and update.effective_user.id == context.user_data.get("responding_to"):
+    if context.user_data.get("waiting_for_paragraph") and update.effective_user.id == context.user_data.get("responding_to"):
+        # Cancel the paragraph timer since user answered
+        if context.user_data.get("paragraph_timer_task") and not context.user_data["paragraph_timer_task"].done():
+            context.user_data["paragraph_timer_task"].cancel()
+        
         context.user_data["paragraph_answer"] = update.message.text
+        context.user_data["waiting_for_paragraph"] = False
+        
+        # Send to admin for review
+        await context.bot.send_message(
+            chat_id=group_chat_id,
+            text=f"Admin, please review {update.effective_user.first_name}'s answer: \"{update.message.text}\"\n\nReply with /approve or /reject."
+        )
+        context.user_data["awaiting_admin_review"] = True
         return
 
     # Handle question selection (only if it's the user's turn and we're not waiting for an answer)
@@ -164,23 +180,40 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif question["type"] == "paragraph":
         question_text = f"{question['question']} (You have 30 seconds to respond.)"
         msg = await context.bot.send_message(chat_id=group_chat_id, text=question_text)
-        context.user_data["manual_review"] = True
+        
+        # Set up paragraph answer waiting
+        context.user_data["waiting_for_paragraph"] = True
         context.user_data["paragraph_answer"] = ""
         context.user_data["responding_to"] = update.effective_user.id
-        await show_timer(context, group_chat_id, msg.message_id, 30, question_text)
-        await asyncio.sleep(31)
+        
+        # Start paragraph timer
+        context.user_data["paragraph_timer_task"] = asyncio.create_task(
+            handle_paragraph_timeout(context, msg.message_id, question_text)
+        )
 
-        user_response = context.user_data.get("paragraph_answer", "").strip()
-        if user_response:
-            await context.bot.send_message(
-                chat_id=group_chat_id,
-                text=f"Admin, please review {update.effective_user.first_name}'s answer: \"{user_response}\". Reply with /approve or /reject."
-            )
-            context.user_data["awaiting_admin_review"] = True
-            return
-
-        current_turn_index += 1
-        await next_turn(context)
+async def handle_paragraph_timeout(context: ContextTypes.DEFAULT_TYPE, message_id: int, original_text: str):
+    """Handle paragraph timeout"""
+    global current_turn_index
+    try:
+        await show_timer(context, group_chat_id, message_id, 30, original_text)
+        await asyncio.sleep(1)  # Small delay to ensure timer shows "Time's up!"
+        
+        # If we're still waiting for an answer, time has run out
+        if context.user_data.get("waiting_for_paragraph"):
+            context.user_data["waiting_for_paragraph"] = False
+            user_id = context.user_data.get("responding_to")
+            if user_id:
+                user = await context.bot.get_chat(user_id)
+                await context.bot.send_message(
+                    chat_id=group_chat_id, 
+                    text=f"⏰ Time's up, {user.first_name}! Moving to next turn."
+                )
+            
+            current_turn_index += 1
+            await next_turn(context)
+    except asyncio.CancelledError:
+        # Timer was cancelled because user answered in time
+        pass
 
 async def handle_mcq_timeout(context: ContextTypes.DEFAULT_TYPE, message_id: int, original_text: str):
     """Handle MCQ timeout"""
@@ -256,26 +289,54 @@ async def end_quiz(context: ContextTypes.DEFAULT_TYPE):
 
 async def approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
+        await update.message.reply_text("Only the admin can approve answers.")
         return
+    
+    if not context.user_data.get("awaiting_admin_review"):
+        await update.message.reply_text("No answer is currently awaiting review.")
+        return
+        
     user_id = context.user_data.get("responding_to")
     if not user_id:
+        await update.message.reply_text("Error: No user found for this review.")
         return
+        
     player_scores[user_id] += 1
     user = await context.bot.get_chat(user_id)
     await context.bot.send_message(chat_id=group_chat_id, text=f"✅ {user.first_name}'s answer has been approved.")
+    
+    # Clear review state
     context.user_data["awaiting_admin_review"] = False
+    context.user_data["responding_to"] = None
+    
+    # Move to next turn
+    global current_turn_index
     current_turn_index += 1
     await next_turn(context)
 
 async def reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
+        await update.message.reply_text("Only the admin can reject answers.")
         return
+    
+    if not context.user_data.get("awaiting_admin_review"):
+        await update.message.reply_text("No answer is currently awaiting review.")
+        return
+        
     user_id = context.user_data.get("responding_to")
     if not user_id:
+        await update.message.reply_text("Error: No user found for this review.")
         return
+        
     user = await context.bot.get_chat(user_id)
     await context.bot.send_message(chat_id=group_chat_id, text=f"❌ {user.first_name}'s answer has been rejected.")
+    
+    # Clear review state
     context.user_data["awaiting_admin_review"] = False
+    context.user_data["responding_to"] = None
+    
+    # Move to next turn
+    global current_turn_index
     current_turn_index += 1
     await next_turn(context)
 
