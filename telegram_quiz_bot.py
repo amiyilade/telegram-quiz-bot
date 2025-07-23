@@ -21,6 +21,8 @@ current_turn_index = 0
 in_progress = False
 message_cache = {}
 group_chat_id = None
+waiting_for_mcq_answer = False  # New state variable
+mcq_timer_task = None  # To store the timer task
 
 # Load questions from JSON
 def load_questions():
@@ -62,12 +64,17 @@ async def begin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await next_turn(context)
 
 async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global in_progress, active_players, player_scores, current_turn_index, answered_questions
+    global in_progress, active_players, player_scores, current_turn_index, answered_questions, waiting_for_mcq_answer, mcq_timer_task
     if update.effective_user.id != ADMIN_ID:
         await update.message.reply_text("Only the host can stop the quiz.")
         return
 
+    # Cancel any running timer
+    if mcq_timer_task and not mcq_timer_task.done():
+        mcq_timer_task.cancel()
+
     in_progress = False
+    waiting_for_mcq_answer = False
     active_players.clear()
     player_scores.clear()
     answered_questions.clear()
@@ -97,10 +104,31 @@ async def next_turn(context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global current_turn_index
+    global current_turn_index, waiting_for_mcq_answer, mcq_timer_task
 
-    if not in_progress or update.effective_user.id != active_players[current_turn_index]:
-        return  # Ignore messages from non-players or out-of-turn users
+    if not in_progress:
+        return
+
+    # Handle MCQ answers
+    if waiting_for_mcq_answer and update.effective_user.id == context.user_data.get("responding_to"):
+        # Cancel the timer since user answered
+        if mcq_timer_task and not mcq_timer_task.done():
+            mcq_timer_task.cancel()
+        
+        await check_mcq_answer(update, context)
+        waiting_for_mcq_answer = False
+        current_turn_index += 1
+        await next_turn(context)
+        return
+
+    # Handle paragraph answers
+    if context.user_data.get("manual_review") and update.effective_user.id == context.user_data.get("responding_to"):
+        context.user_data["paragraph_answer"] = update.message.text
+        return
+
+    # Handle question selection (only if it's the user's turn and we're not waiting for an answer)
+    if update.effective_user.id != active_players[current_turn_index] or waiting_for_mcq_answer:
+        return
 
     chosen = update.message.text.strip()
     if chosen not in question_pool or chosen in answered_questions:
@@ -115,6 +143,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         lettered_options = [f"{chr(97 + i)}) {opt}" for i, opt in enumerate(options)]  # a) option1, b) option2, ...
         question_text = f"{question['question']}\nOptions:\n" + "\n".join(lettered_options)
         msg = await context.bot.send_message(chat_id=group_chat_id, text=question_text)
+        
+        # Set up answer checking data
         context.user_data["current_answer"] = question["answer"].strip().lower()
         context.user_data["options_map"] = {
             chr(97 + i): opt.strip().lower() for i, opt in enumerate(options)
@@ -124,9 +154,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             chr(65 + i): opt.strip().lower() for i, opt in enumerate(options)
         })
         context.user_data["responding_to"] = update.effective_user.id
-        await show_timer(context, group_chat_id, msg.message_id, 30, question_text)
-        await asyncio.sleep(31)
-        await check_mcq_answer(update, context)
+        
+        # Set state to wait for MCQ answer
+        waiting_for_mcq_answer = True
+        
+        # Start timer
+        mcq_timer_task = asyncio.create_task(handle_mcq_timeout(context, msg.message_id, question_text))
 
     elif question["type"] == "paragraph":
         question_text = f"{question['question']} (You have 30 seconds to respond.)"
@@ -146,23 +179,56 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data["awaiting_admin_review"] = True
             return
 
-    current_turn_index += 1
-    await next_turn(context)
+        current_turn_index += 1
+        await next_turn(context)
+
+async def handle_mcq_timeout(context: ContextTypes.DEFAULT_TYPE, message_id: int, original_text: str):
+    """Handle MCQ timeout"""
+    global waiting_for_mcq_answer, current_turn_index
+    try:
+        await show_timer(context, group_chat_id, message_id, 30, original_text)
+        await asyncio.sleep(1)  # Small delay to ensure timer shows "Time's up!"
+        
+        # If we're still waiting for an answer, time has run out
+        if waiting_for_mcq_answer:
+            waiting_for_mcq_answer = False
+            user_id = context.user_data.get("responding_to")
+            if user_id:
+                user = await context.bot.get_chat(user_id)
+                correct_answer = context.user_data.get("current_answer", "")
+                await context.bot.send_message(
+                    chat_id=group_chat_id, 
+                    text=f"⏰ Time's up, {user.first_name}! The correct answer was: {correct_answer}"
+                )
+            
+            current_turn_index += 1
+            await next_turn(context)
+    except asyncio.CancelledError:
+        # Timer was cancelled because user answered in time
+        pass
 
 async def check_mcq_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     user_id = user.id
-    answer = context.user_data.get("current_answer", "").strip().lower()
+    correct_answer = context.user_data.get("current_answer", "").strip().lower()
     options_map = context.user_data.get("options_map", {})
-    response = update.message.text.strip().lower()
+    user_response = update.message.text.strip()
 
-    interpreted_response = options_map.get(response.lower(), response.lower()).strip().lower()
+    # Normalize user response - remove whitespace and convert to lowercase
+    normalized_response = user_response.replace(" ", "").lower()
+    
+    # Check if user typed a letter (a, b, c, d)
+    if normalized_response in options_map:
+        interpreted_response = options_map[normalized_response]
+    else:
+        # User typed the actual answer, normalize it
+        interpreted_response = normalized_response
 
-    if interpreted_response == answer:
+    if interpreted_response == correct_answer:
         player_scores[user_id] += 1
         await context.bot.send_message(chat_id=group_chat_id, text=f"✅ {user.first_name}, that's correct!")
     else:
-        await context.bot.send_message(chat_id=group_chat_id, text=f"❌ {user.first_name}, that's incorrect. The correct answer was: {answer}")
+        await context.bot.send_message(chat_id=group_chat_id, text=f"❌ {user.first_name}, that's incorrect. The correct answer was: {correct_answer}")
 
 async def show_timer(context: ContextTypes.DEFAULT_TYPE, chat_id: int, message_id: int, duration: int, original_text: str):
     for remaining in range(duration, 0, -10):
@@ -198,6 +264,7 @@ async def approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = await context.bot.get_chat(user_id)
     await context.bot.send_message(chat_id=group_chat_id, text=f"✅ {user.first_name}'s answer has been approved.")
     context.user_data["awaiting_admin_review"] = False
+    current_turn_index += 1
     await next_turn(context)
 
 async def reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -209,6 +276,7 @@ async def reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = await context.bot.get_chat(user_id)
     await context.bot.send_message(chat_id=group_chat_id, text=f"❌ {user.first_name}'s answer has been rejected.")
     context.user_data["awaiting_admin_review"] = False
+    current_turn_index += 1
     await next_turn(context)
 
 if __name__ == "__main__":
