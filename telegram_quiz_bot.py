@@ -111,12 +111,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     answered_questions.add(chosen)
 
     if question["type"] == "mcq":
-        question_text = f"{question['question']}\nOptions:\n" + "\n".join(question["options"])
+        options = question["options"]
+        lettered_options = [f"{chr(97 + i)}) {opt}" for i, opt in enumerate(options)]  # a) option1, b) option2, ...
+        question_text = f"{question['question']}\nOptions:\n" + "\n".join(lettered_options)
         msg = await context.bot.send_message(chat_id=group_chat_id, text=question_text)
-        context.user_data["current_answer"] = question["answer"]
+        context.user_data["current_answer"] = question["answer"].strip().lower()
+        context.user_data["options_map"] = {
+            chr(97 + i): opt.strip().lower() for i, opt in enumerate(options)
+        }
         context.user_data["responding_to"] = update.effective_user.id
         await show_timer(context, group_chat_id, msg.message_id, 30, question_text)
-
         await asyncio.sleep(31)
         await check_mcq_answer(update, context)
 
@@ -124,9 +128,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         question_text = f"{question['question']} (You have 30 seconds to respond.)"
         msg = await context.bot.send_message(chat_id=group_chat_id, text=question_text)
         context.user_data["manual_review"] = True
+        context.user_data["paragraph_answer"] = ""
         context.user_data["responding_to"] = update.effective_user.id
         await show_timer(context, group_chat_id, msg.message_id, 30, question_text)
         await asyncio.sleep(31)
+
+        user_response = context.user_data.get("paragraph_answer", "").strip()
+        if user_response:
+            await context.bot.send_message(
+                chat_id=group_chat_id,
+                text=f"Admin, please review {update.effective_user.first_name}'s answer: \"{user_response}\". Reply with /approve or /reject."
+            )
+            context.user_data["awaiting_admin_review"] = True
+            return
 
     current_turn_index += 1
     await next_turn(context)
@@ -135,9 +149,12 @@ async def check_mcq_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     user_id = user.id
     answer = context.user_data.get("current_answer")
-    response = update.message.text.strip()
+    options_map = context.user_data.get("options_map", {})
+    response = update.message.text.strip().lower()
 
-    if response.lower() == answer.lower():
+    interpreted_response = options_map.get(response, response)  # Convert 'a' to actual answer if needed
+
+    if interpreted_response == answer:
         player_scores[user_id] += 1
         await context.bot.send_message(chat_id=group_chat_id, text=f"✅ {user.first_name}, that's correct!")
     else:
@@ -167,11 +184,36 @@ async def end_quiz(context: ContextTypes.DEFAULT_TYPE):
         result.append(f"{i+1}. {name} — {score} point(s)")
     await context.bot.send_message(chat_id=group_chat_id, text="\n".join(result))
 
+async def approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+    user_id = context.user_data.get("responding_to")
+    if not user_id:
+        return
+    player_scores[user_id] += 1
+    user = await context.bot.get_chat(user_id)
+    await context.bot.send_message(chat_id=group_chat_id, text=f"✅ {user.first_name}'s answer has been approved.")
+    context.user_data["awaiting_admin_review"] = False
+    await next_turn(context)
+
+async def reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+    user_id = context.user_data.get("responding_to")
+    if not user_id:
+        return
+    user = await context.bot.get_chat(user_id)
+    await context.bot.send_message(chat_id=group_chat_id, text=f"❌ {user.first_name}'s answer has been rejected.")
+    context.user_data["awaiting_admin_review"] = False
+    await next_turn(context)
+
 if __name__ == "__main__":
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("join", join))
     app.add_handler(CommandHandler("begin", begin))
     app.add_handler(CommandHandler("stop", stop))
+    app.add_handler(CommandHandler("approve", approve))
+    app.add_handler(CommandHandler("reject", reject))
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
     app.run_polling()
