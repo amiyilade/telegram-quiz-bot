@@ -119,6 +119,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["options_map"] = {
             chr(97 + i): opt.strip().lower() for i, opt in enumerate(options)
         }
+        # Also include uppercase letters for user input flexibility
+        context.user_data["options_map"].update({
+            chr(65 + i): opt.strip().lower() for i, opt in enumerate(options)
+        })
         context.user_data["responding_to"] = update.effective_user.id
         await show_timer(context, group_chat_id, msg.message_id, 30, question_text)
         await asyncio.sleep(31)
@@ -148,11 +152,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def check_mcq_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     user_id = user.id
-    answer = context.user_data.get("current_answer")
+    answer = context.user_data.get("current_answer", "").strip().lower()
     options_map = context.user_data.get("options_map", {})
     response = update.message.text.strip().lower()
 
-    interpreted_response = options_map.get(response, response)  # Convert 'a' to actual answer if needed
+    interpreted_response = options_map.get(response.lower(), response.lower()).strip().lower()
 
     if interpreted_response == answer:
         player_scores[user_id] += 1
