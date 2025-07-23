@@ -111,26 +111,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     answered_questions.add(chosen)
 
     if question["type"] == "mcq":
-        options_text = "\n".join(question["options"])
-        msg = await context.bot.send_message(
-            chat_id=group_chat_id,
-            text=f"{question['question']}\nOptions:\n{options_text}"
-        )
+        question_text = f"{question['question']}\nOptions:\n" + "\n".join(question["options"])
+        msg = await context.bot.send_message(chat_id=group_chat_id, text=question_text)
         context.user_data["current_answer"] = question["answer"]
         context.user_data["responding_to"] = update.effective_user.id
-        await show_timer(context, group_chat_id, msg.message_id, 30)
+        await show_timer(context, group_chat_id, msg.message_id, 30, question_text)
 
         await asyncio.sleep(31)
         await check_mcq_answer(update, context)
 
     elif question["type"] == "paragraph":
-        msg = await context.bot.send_message(
-            chat_id=group_chat_id,
-            text=f"{question['question']} (You have 30 seconds to respond.)"
-        )
+        question_text = f"{question['question']} (You have 30 seconds to respond.)"
+        msg = await context.bot.send_message(chat_id=group_chat_id, text=question_text)
         context.user_data["manual_review"] = True
         context.user_data["responding_to"] = update.effective_user.id
-        await show_timer(context, group_chat_id, msg.message_id, 30)
+        await show_timer(context, group_chat_id, msg.message_id, 30, question_text)
         await asyncio.sleep(31)
 
     current_turn_index += 1
@@ -148,11 +143,19 @@ async def check_mcq_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await context.bot.send_message(chat_id=group_chat_id, text=f"❌ {user.first_name}, that's incorrect. The correct answer was: {answer}")
 
-async def show_timer(context: ContextTypes.DEFAULT_TYPE, chat_id: int, message_id: int, duration: int):
+async def show_timer(context: ContextTypes.DEFAULT_TYPE, chat_id: int, message_id: int, duration: int, original_text: str):
     for remaining in range(duration, 0, -10):
-        await context.bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=f"⏳ {remaining} seconds left...")
+        await context.bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=message_id,
+            text=f"{original_text}\n\n⏳ {remaining} seconds left..."
+        )
         await asyncio.sleep(10)
-    await context.bot.edit_message_text(chat_id=chat_id, message_id=message_id, text="⏰ Time's up!")
+    await context.bot.edit_message_text(
+        chat_id=chat_id,
+        message_id=message_id,
+        text=f"{original_text}\n\n⏰ Time's up!"
+    )
 
 async def end_quiz(context: ContextTypes.DEFAULT_TYPE):
     global in_progress
