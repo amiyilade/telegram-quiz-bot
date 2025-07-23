@@ -1,0 +1,18 @@
+[
+  {
+    "type": "mcq",
+    "question": "Who led the Israelites out of Egypt?",
+    "options": [
+      "Moses",
+      "Abraham",
+      "David",
+      "Paul"
+    ],
+    "answer": "Moses"
+  },
+  {
+    "type": "paragraph",
+    "question": "Briefly explain the significance of the resurrection of Jesus.",
+    "answer": "open-ended"
+  }
+]
