@@ -39,8 +39,7 @@ tiebreaker_state = {
     "speed_round_question": None,
     "waiting_for_speed_answer": False,
     "first_responder": None,
-    "speed_timer_task": None,
-    "used_speed_questions": set()
+    "speed_timer_task": None
 }
 
 # Global review state (shared across all users)
@@ -173,8 +172,7 @@ async def begin(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "speed_round_question": None,
         "waiting_for_speed_answer": False,
         "first_responder": None,
-        "speed_timer_task": None,
-        "used_speed_questions": set()
+        "speed_timer_task": None
     }
 
     save_game_state()
@@ -189,31 +187,15 @@ async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Only admins can stop the quiz.")
         return
 
-    # Cancel MCQ timer
+    # Cancel any running timers
     if mcq_timer_task and not mcq_timer_task.done():
         mcq_timer_task.cancel()
-        mcq_timer_task = None
     
-    # Cancel tiebreaker speed timer
     if tiebreaker_state.get("speed_timer_task") and not tiebreaker_state["speed_timer_task"].done():
         tiebreaker_state["speed_timer_task"].cancel()
     
-    # Cancel paragraph timer from context.user_data (this is the problematic one)
     if context.user_data.get("paragraph_timer_task") and not context.user_data["paragraph_timer_task"].done():
         context.user_data["paragraph_timer_task"].cancel()
-    
-    # Cancel any other timers that might be running
-    # We need to be more aggressive about cleaning up all possible timer references
-    try:
-        # Get all tasks and try to cancel any that might be related to our bot
-        import asyncio
-        for task in asyncio.all_tasks():
-            if not task.done() and hasattr(task, '_coro') and task._coro:
-                coro_name = getattr(task._coro, '__name__', '')
-                if coro_name in ['handle_mcq_timeout', 'handle_paragraph_timeout', 'handle_speed_round_timeout']:
-                    task.cancel()
-    except Exception as e:
-        print(f"Error cancelling tasks: {e}")
 
     in_progress = False
     waiting_for_mcq_answer = False
@@ -237,8 +219,7 @@ async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "speed_round_question": None,
         "waiting_for_speed_answer": False,
         "first_responder": None,
-        "speed_timer_task": None,
-        "used_speed_questions": set()
+        "speed_timer_task": None
     }
     
     save_game_state()
@@ -394,7 +375,6 @@ async def tiebreaker(update: Update, context: ContextTypes.DEFAULT_TYPE):
     tiebreaker_state["in_progress"] = True
     tiebreaker_state["tied_players"] = tied_players
     tiebreaker_state["current_phase"] = "speed_round"
-    tiebreaker_state["used_speed_questions"] = set()
     
     save_game_state()
     
@@ -427,40 +407,10 @@ async def start_speed_round(context: ContextTypes.DEFAULT_TYPE):
         await start_paragraph_tiebreaker(context)
         return
     
-    # Initialize used questions tracker
-    tiebreaker_state['used_speed_questions'] = set()
-    
     question = random.choice(tiebreaker_questions)
     tiebreaker_state["speed_round_question"] = question
     tiebreaker_state["waiting_for_speed_answer"] = True
     tiebreaker_state["first_responder"] = None
-    
-    # Add to used questions
-    tiebreaker_state['used_speed_questions'].add(question.get("id", str(question)))
-    
-    # Format question
-    options = question["options"]
-    lettered_options = [f"{chr(97 + i)}) {opt}" for i, opt in enumerate(options)]
-    question_text = f"⚡ **SPEED ROUND**\n{question['question']}\nOptions:\n" + "\n".join(lettered_options) + "\n\n**First correct answer wins!**"
-    
-    msg = await context.bot.send_message(chat_id=group_chat_id, text=question_text, parse_mode="Markdown")
-    
-    # Start 30-second timer
-    tiebreaker_state["speed_timer_task"] = asyncio.create_task(
-        handle_speed_round_timeout(context, msg.message_id, question_text)
-    )
-    
-    save_game_state()
-
-async def start_next_speed_question(context: ContextTypes.DEFAULT_TYPE, available_questions):
-    """Start the next speed round question"""
-    question = random.choice(available_questions)
-    tiebreaker_state["speed_round_question"] = question
-    tiebreaker_state["waiting_for_speed_answer"] = True
-    tiebreaker_state["first_responder"] = None
-    
-    # Add to used questions
-    tiebreaker_state['used_speed_questions'].add(question.get("id", str(question)))
     
     # Format question
     options = question["options"]
@@ -484,30 +434,11 @@ async def handle_speed_round_timeout(context: ContextTypes.DEFAULT_TYPE, message
         
         if tiebreaker_state["waiting_for_speed_answer"]:
             tiebreaker_state["waiting_for_speed_answer"] = False
-            
-            # Find remaining tiebreaker MCQ questions
-            tiebreaker_questions = [q for q in questions_data if q.get("is_tiebreaker") and q["type"] == "mcq"]
-            used_questions = tiebreaker_state.get('used_speed_questions', set())
-            
-            # Find unused questions
-            available_questions = [q for q in tiebreaker_questions 
-                                 if q.get("id", str(q)) not in used_questions]
-            
-            if available_questions:
-                # Start next speed round question
-                await context.bot.send_message(
-                    chat_id=group_chat_id,
-                    text="⏰ Time's up! No correct answer. Next speed round question..."
-                )
-                await asyncio.sleep(2)  # Brief pause
-                await start_next_speed_question(context, available_questions)
-            else:
-                # No more speed round questions, move to paragraph
-                await context.bot.send_message(
-                    chat_id=group_chat_id,
-                    text="⏰ Time's up! No more speed round questions. Moving to paragraph phase..."
-                )
-                await start_paragraph_tiebreaker(context)
+            await context.bot.send_message(
+                chat_id=group_chat_id,
+                text="⏰ Speed round time's up! No winner. Moving to paragraph phase..."
+            )
+            await start_paragraph_tiebreaker(context)
     except asyncio.CancelledError:
         pass
 
@@ -699,7 +630,9 @@ async def handle_speed_round_answer(update: Update, context: ContextTypes.DEFAUL
     user = update.effective_user
     user_response = update.message.text.strip()
     
-    # Don't cancel timer here - let it continue running
+    # Cancel timer
+    if tiebreaker_state["speed_timer_task"] and not tiebreaker_state["speed_timer_task"].done():
+        tiebreaker_state["speed_timer_task"].cancel()
     
     # Check answer
     correct_answer = question["answer"].strip().lower()
@@ -715,10 +648,7 @@ async def handle_speed_round_answer(update: Update, context: ContextTypes.DEFAUL
         interpreted_response = normalized_response
     
     if interpreted_response == correct_answer:
-        # Winner found! Cancel timer and end speed round
-        if tiebreaker_state["speed_timer_task"] and not tiebreaker_state["speed_timer_task"].done():
-            tiebreaker_state["speed_timer_task"].cancel()
-        
+        # Winner found!
         tiebreaker_state["waiting_for_speed_answer"] = False
         tiebreaker_state["in_progress"] = False
         
@@ -728,7 +658,6 @@ async def handle_speed_round_answer(update: Update, context: ContextTypes.DEFAUL
         )
         save_game_state()
     else:
-        # Incorrect answer - just notify but keep timer running
         await context.bot.send_message(
             chat_id=group_chat_id,
             text=f"❌ {user.first_name}, that's incorrect. Keep trying!"
