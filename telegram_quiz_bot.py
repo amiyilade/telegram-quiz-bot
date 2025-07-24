@@ -16,84 +16,122 @@ BACKUP_ADMIN_IDS = [int(x.strip()) for x in os.getenv("BACKUP_ADMIN_IDS", "").sp
 ALL_ADMIN_IDS = [ADMIN_ID] + BACKUP_ADMIN_IDS
 
 QUESTIONS_FILE = "questions.json"
-STATE_FILE = "game_state.pkl"
+STATE_FILE = "game_states.pkl"
 
-# Global state
+# Global data structures
 questions_data = []
 question_pool = {}
-active_players = []
-player_scores = {}
-answered_questions = set()
-current_turn_index = 0
-in_progress = False
-message_cache = {}
-group_chat_id = None
-waiting_for_mcq_answer = False
-mcq_timer_task = None
-
-# Tiebreaker state
-tiebreaker_state = {
-    "in_progress": False,
-    "tied_players": [],
-    "current_phase": None,  # "speed_round" or "paragraph"
-    "speed_round_question": None,
-    "waiting_for_speed_answer": False,
-    "first_responder": None,
-    "speed_timer_task": None
-}
-
-# Global review state (shared across all users)
-review_state = {
-    "awaiting_admin_review": False,
-    "responding_user_id": None,
-    "paragraph_answer": None
-}
+game_states = {}  # chat_id -> game_state dictionary
 
 def is_admin(user_id):
     """Check if user is an admin"""
     return user_id in ALL_ADMIN_IDS
 
+def get_game_state(chat_id):
+    """Get or create game state for a specific chat"""
+    if chat_id not in game_states:
+        game_states[chat_id] = {
+            "active_players": [],
+            "player_scores": {},
+            "answered_questions": set(),
+            "current_turn_index": 0,
+            "in_progress": False,
+            "waiting_for_mcq_answer": False,
+            "mcq_timer_task": None,
+            "tiebreaker_state": {
+                "in_progress": False,
+                "tied_players": [],
+                "current_phase": None,
+                "speed_round_question": None,
+                "waiting_for_speed_answer": False,
+                "first_responder": None,
+                "speed_timer_task": None
+            },
+            "review_state": {
+                "awaiting_admin_review": False,
+                "responding_user_id": None,
+                "paragraph_answer": None
+            },
+            "user_data": {}  # user_id -> user_specific_data
+        }
+    return game_states[chat_id]
+
+def get_user_data(chat_id, user_id):
+    """Get or create user data for a specific user in a specific chat"""
+    game_state = get_game_state(chat_id)
+    if user_id not in game_state["user_data"]:
+        game_state["user_data"][user_id] = {}
+    return game_state["user_data"][user_id]
+
 def save_game_state():
-    """Save current game state to file"""
-    state = {
-        "active_players": active_players,
-        "player_scores": player_scores,
-        "answered_questions": list(answered_questions),
-        "current_turn_index": current_turn_index,
-        "in_progress": in_progress,
-        "group_chat_id": group_chat_id,
-        "waiting_for_mcq_answer": waiting_for_mcq_answer,
-        "tiebreaker_state": tiebreaker_state.copy(),
-        "review_state": review_state.copy(),
-        "timestamp": datetime.now().isoformat()
-    }
+    """Save current game states to file"""
+    # Convert sets to lists for JSON serialization
+    serializable_states = {}
+    for chat_id, state in game_states.items():
+        serializable_states[str(chat_id)] = {
+            "active_players": state["active_players"],
+            "player_scores": state["player_scores"],
+            "answered_questions": list(state["answered_questions"]),
+            "current_turn_index": state["current_turn_index"],
+            "in_progress": state["in_progress"],
+            "waiting_for_mcq_answer": state["waiting_for_mcq_answer"],
+            "tiebreaker_state": {
+                "in_progress": state["tiebreaker_state"]["in_progress"],
+                "tied_players": state["tiebreaker_state"]["tied_players"],
+                "current_phase": state["tiebreaker_state"]["current_phase"],
+                "speed_round_question": state["tiebreaker_state"]["speed_round_question"],
+                "waiting_for_speed_answer": state["tiebreaker_state"]["waiting_for_speed_answer"],
+                "first_responder": state["tiebreaker_state"]["first_responder"]
+            },
+            "review_state": state["review_state"].copy(),
+            "user_data": state["user_data"],
+            "timestamp": datetime.now().isoformat()
+        }
+    
     try:
         with open(STATE_FILE, "wb") as f:
-            pickle.dump(state, f)
+            pickle.dump(serializable_states, f)
     except Exception as e:
         print(f"Error saving game state: {e}")
 
 def load_game_state():
-    """Load game state from file"""
-    global active_players, player_scores, answered_questions, current_turn_index
-    global in_progress, group_chat_id, waiting_for_mcq_answer, tiebreaker_state, review_state
+    """Load game states from file"""
+    global game_states
     
     try:
         if os.path.exists(STATE_FILE):
             with open(STATE_FILE, "rb") as f:
-                state = pickle.load(f)
+                serializable_states = pickle.load(f)
             
-            active_players = state.get("active_players", [])
-            player_scores = state.get("player_scores", {})
-            answered_questions = set(state.get("answered_questions", []))
-            current_turn_index = state.get("current_turn_index", 0)
-            in_progress = state.get("in_progress", False)
-            group_chat_id = state.get("group_chat_id", None)
-            waiting_for_mcq_answer = state.get("waiting_for_mcq_answer", False)
-            tiebreaker_state.update(state.get("tiebreaker_state", {}))
-            review_state.update(state.get("review_state", {}))
+            game_states = {}
+            for chat_id_str, state in serializable_states.items():
+                chat_id = int(chat_id_str)
+                game_states[chat_id] = {
+                    "active_players": state.get("active_players", []),
+                    "player_scores": state.get("player_scores", {}),
+                    "answered_questions": set(state.get("answered_questions", [])),
+                    "current_turn_index": state.get("current_turn_index", 0),
+                    "in_progress": state.get("in_progress", False),
+                    "waiting_for_mcq_answer": state.get("waiting_for_mcq_answer", False),
+                    "mcq_timer_task": None,  # Don't restore timer tasks
+                    "tiebreaker_state": {
+                        "in_progress": state.get("tiebreaker_state", {}).get("in_progress", False),
+                        "tied_players": state.get("tiebreaker_state", {}).get("tied_players", []),
+                        "current_phase": state.get("tiebreaker_state", {}).get("current_phase", None),
+                        "speed_round_question": state.get("tiebreaker_state", {}).get("speed_round_question", None),
+                        "waiting_for_speed_answer": state.get("tiebreaker_state", {}).get("waiting_for_speed_answer", False),
+                        "first_responder": state.get("tiebreaker_state", {}).get("first_responder", None),
+                        "speed_timer_task": None  # Don't restore timer tasks
+                    },
+                    "review_state": state.get("review_state", {
+                        "awaiting_admin_review": False,
+                        "responding_user_id": None,
+                        "paragraph_answer": None
+                    }),
+                    "user_data": state.get("user_data", {})
+                }
             
-            print(f"Game state loaded from {state.get('timestamp', 'unknown time')}")
+            print(f"Game states loaded for {len(game_states)} groups")
             return True
     except Exception as e:
         print(f"Error loading game state: {e}")
@@ -123,49 +161,51 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def join(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.effective_user:
         return
+    
+    chat_id = update.effective_chat.id
+    game_state = get_game_state(chat_id)
     user = update.effective_user
-    global in_progress
-    if user.id not in active_players and not in_progress:
-        active_players.append(user.id)
-        player_scores[user.id] = 0
+    
+    if user.id not in game_state["active_players"] and not game_state["in_progress"]:
+        game_state["active_players"].append(user.id)
+        game_state["player_scores"][user.id] = 0
         save_game_state()
         await update.message.reply_text(f"{user.first_name} has joined the quiz!")
-    elif in_progress:
+    elif game_state["in_progress"]:
         await update.message.reply_text("The quiz is already in progress. Wait for the next one.")
 
 async def begin(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global in_progress, current_turn_index, answered_questions, group_chat_id, review_state, tiebreaker_state, question_pool
     if not update.message or not update.effective_user:
         return
     if not is_admin(update.effective_user.id):
         await update.message.reply_text("Only admins can start the quiz.")
         return
 
-    if not active_players:
+    chat_id = update.effective_chat.id
+    game_state = get_game_state(chat_id)
+
+    if not game_state["active_players"]:
         await update.message.reply_text("No players have joined.")
         return
 
     # Rebuild question pool to exclude tiebreaker questions
-    question_pool = build_regular_question_pool()
-    
     if not question_pool:
         await update.message.reply_text("No regular questions available! Please add non-tiebreaker questions to the quiz.")
         return
 
-    group_chat_id = update.effective_chat.id
-    in_progress = True
-    current_turn_index = 0
-    answered_questions = set()
+    game_state["in_progress"] = True
+    game_state["current_turn_index"] = 0
+    game_state["answered_questions"] = set()
     
     # Reset review state
-    review_state = {
+    game_state["review_state"] = {
         "awaiting_admin_review": False,
         "responding_user_id": None,
         "paragraph_answer": None
     }
     
     # Reset tiebreaker state
-    tiebreaker_state = {
+    game_state["tiebreaker_state"] = {
         "in_progress": False,
         "tied_players": [],
         "current_phase": None,
@@ -176,43 +216,49 @@ async def begin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     }
 
     save_game_state()
-    await context.bot.send_message(chat_id=group_chat_id, text="Quiz starting now!")
-    await next_turn(context)
+    await context.bot.send_message(chat_id=chat_id, text="Quiz starting now!")
+    await next_turn(context, chat_id)
 
 async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global in_progress, active_players, player_scores, current_turn_index, answered_questions
-    global waiting_for_mcq_answer, mcq_timer_task, review_state, tiebreaker_state
-    
+    if not update.message or not update.effective_user:
+        return
+        
     if not is_admin(update.effective_user.id):
         await update.message.reply_text("Only admins can stop the quiz.")
         return
 
-    # Cancel any running timers
-    if mcq_timer_task and not mcq_timer_task.done():
-        mcq_timer_task.cancel()
-    
-    if tiebreaker_state.get("speed_timer_task") and not tiebreaker_state["speed_timer_task"].done():
-        tiebreaker_state["speed_timer_task"].cancel()
-    
-    if context.user_data.get("paragraph_timer_task") and not context.user_data["paragraph_timer_task"].done():
-        context.user_data["paragraph_timer_task"].cancel()
+    chat_id = update.effective_chat.id
+    game_state = get_game_state(chat_id)
 
-    in_progress = False
-    waiting_for_mcq_answer = False
-    context.user_data.clear()
-    active_players.clear()
-    player_scores.clear()
-    answered_questions.clear()
-    current_turn_index = 0
+    # Cancel any running timers
+    if game_state["mcq_timer_task"] and not game_state["mcq_timer_task"].done():
+        game_state["mcq_timer_task"].cancel()
+    
+    if game_state["tiebreaker_state"].get("speed_timer_task") and not game_state["tiebreaker_state"]["speed_timer_task"].done():
+        game_state["tiebreaker_state"]["speed_timer_task"].cancel()
+    
+    # Cancel paragraph timers for all users
+    for user_id, user_data in game_state["user_data"].items():
+        if user_data.get("paragraph_timer_task") and not user_data["paragraph_timer_task"].done():
+            user_data["paragraph_timer_task"].cancel()
+
+    # Reset game state for this chat
+    game_state["in_progress"] = False
+    game_state["waiting_for_mcq_answer"] = False
+    game_state["active_players"].clear()
+    game_state["player_scores"].clear()
+    game_state["answered_questions"].clear()
+    game_state["current_turn_index"] = 0
+    game_state["user_data"].clear()
     
     # Reset states
-    review_state = {
+    game_state["review_state"] = {
         "awaiting_admin_review": False,
         "responding_user_id": None,
         "paragraph_answer": None
     }
     
-    tiebreaker_state = {
+    game_state["tiebreaker_state"] = {
         "in_progress": False,
         "tied_players": [],
         "current_phase": None,
@@ -223,12 +269,10 @@ async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     }
     
     save_game_state()
-    await context.bot.send_message(chat_id=group_chat_id, text="Quiz has been stopped.")
+    await context.bot.send_message(chat_id=chat_id, text="Quiz has been stopped.")
 
 async def skip(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Admin command to skip current turn"""
-    global current_turn_index, waiting_for_mcq_answer, mcq_timer_task
-    
     if not update.message or not update.effective_user:
         return
         
@@ -236,92 +280,105 @@ async def skip(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Only admins can skip turns.")
         return
     
-    if not in_progress:
+    chat_id = update.effective_chat.id
+    game_state = get_game_state(chat_id)
+    
+    if not game_state["in_progress"]:
         await update.message.reply_text("No quiz is currently in progress.")
         return
     
     # Cancel any active timers
-    if mcq_timer_task and not mcq_timer_task.done():
-        mcq_timer_task.cancel()
+    if game_state["mcq_timer_task"] and not game_state["mcq_timer_task"].done():
+        game_state["mcq_timer_task"].cancel()
         
-    if context.user_data.get("paragraph_timer_task") and not context.user_data["paragraph_timer_task"].done():
-        context.user_data["paragraph_timer_task"].cancel()
+    # Cancel paragraph timer for current user
+    if game_state["current_turn_index"] < len(game_state["active_players"]):
+        current_user_id = game_state["active_players"][game_state["current_turn_index"]]
+        user_data = get_user_data(chat_id, current_user_id)
+        if user_data.get("paragraph_timer_task") and not user_data["paragraph_timer_task"].done():
+            user_data["paragraph_timer_task"].cancel()
     
     # Reset waiting states
-    waiting_for_mcq_answer = False
-    context.user_data["waiting_for_paragraph"] = False
+    game_state["waiting_for_mcq_answer"] = False
+    
+    # Clear user waiting states
+    for user_data in game_state["user_data"].values():
+        user_data["waiting_for_paragraph"] = False
     
     # Clear review state if waiting
-    if review_state["awaiting_admin_review"]:
-        review_state["awaiting_admin_review"] = False
-        review_state["responding_user_id"] = None
-        review_state["paragraph_answer"] = None
+    if game_state["review_state"]["awaiting_admin_review"]:
+        game_state["review_state"]["awaiting_admin_review"] = False
+        game_state["review_state"]["responding_user_id"] = None
+        game_state["review_state"]["paragraph_answer"] = None
     
     # Get current player name for message
-    if current_turn_index < len(active_players):
-        user_id = active_players[current_turn_index]
+    if game_state["current_turn_index"] < len(game_state["active_players"]):
+        user_id = game_state["active_players"][game_state["current_turn_index"]]
         user = await context.bot.get_chat(user_id)
         await context.bot.send_message(
-            chat_id=group_chat_id, 
+            chat_id=chat_id, 
             text=f"⏭️ Admin skipped {user.first_name}'s turn."
         )
     
-    current_turn_index += 1
+    game_state["current_turn_index"] += 1
     save_game_state()
-    await next_turn(context)
+    await next_turn(context, chat_id)
 
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Show current game status"""
     if not update.message:
         return
-        
+    
+    chat_id = update.effective_chat.id
+    game_state = get_game_state(chat_id)
+    
     status_lines = ["📊 **Game Status**"]
     
-    if not in_progress and not tiebreaker_state["in_progress"]:
+    if not game_state["in_progress"] and not game_state["tiebreaker_state"]["in_progress"]:
         status_lines.append("• No quiz in progress")
-        if active_players:
-            status_lines.append(f"• {len(active_players)} players waiting to start")
+        if game_state["active_players"]:
+            status_lines.append(f"• {len(game_state['active_players'])} players waiting to start")
         else:
             status_lines.append("• No players joined")
-    elif tiebreaker_state["in_progress"]:
+    elif game_state["tiebreaker_state"]["in_progress"]:
         status_lines.append("🏆 **Tiebreaker in Progress**")
         tied_names = []
-        for uid in tiebreaker_state["tied_players"]:
+        for uid in game_state["tiebreaker_state"]["tied_players"]:
             try:
                 user = await context.bot.get_chat(uid)
                 tied_names.append(user.first_name)
             except:
                 tied_names.append(f"User {uid}")
         status_lines.append(f"• Tied players: {', '.join(tied_names)}")
-        status_lines.append(f"• Phase: {tiebreaker_state['current_phase']}")
-        if tiebreaker_state["waiting_for_speed_answer"]:
+        status_lines.append(f"• Phase: {game_state['tiebreaker_state']['current_phase']}")
+        if game_state["tiebreaker_state"]["waiting_for_speed_answer"]:
             status_lines.append("• Waiting for speed round answers")
     else:
         status_lines.append("• Quiz in progress")
-        status_lines.append(f"• Players: {len(active_players)}")
-        status_lines.append(f"• Questions answered: {len(answered_questions)}/{len(question_pool)}")
+        status_lines.append(f"• Players: {len(game_state['active_players'])}")
+        status_lines.append(f"• Questions answered: {len(game_state['answered_questions'])}/{len(question_pool)}")
         
-        if current_turn_index < len(active_players):
-            current_user_id = active_players[current_turn_index]
+        if game_state["current_turn_index"] < len(game_state["active_players"]):
+            current_user_id = game_state["active_players"][game_state["current_turn_index"]]
             try:
                 current_user = await context.bot.get_chat(current_user_id)
                 status_lines.append(f"• Current turn: {current_user.first_name}")
             except:
                 status_lines.append(f"• Current turn: User {current_user_id}")
         
-        if waiting_for_mcq_answer:
+        if game_state["waiting_for_mcq_answer"]:
             status_lines.append("• Waiting for MCQ answer")
-        elif context.user_data.get("waiting_for_paragraph"):
+        elif any(user_data.get("waiting_for_paragraph") for user_data in game_state["user_data"].values()):
             status_lines.append("• Waiting for paragraph answer")
-        elif review_state["awaiting_admin_review"]:
+        elif game_state["review_state"]["awaiting_admin_review"]:
             status_lines.append("• Waiting for admin review")
         else:
             status_lines.append("• Waiting for question selection")
     
     # Show current scores
-    if player_scores:
+    if game_state["player_scores"]:
         status_lines.append("\n📈 **Current Scores:**")
-        sorted_scores = sorted(player_scores.items(), key=lambda x: x[1], reverse=True)
+        sorted_scores = sorted(game_state["player_scores"].items(), key=lambda x: x[1], reverse=True)
         for uid, score in sorted_scores:
             try:
                 user = await context.bot.get_chat(uid)
@@ -342,20 +399,19 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text("\n".join(status_lines), parse_mode="Markdown")
 
-def detect_tie():
+def detect_tie(chat_id):
     """Detect if there's a tie in the current scores"""
-    if not player_scores:
+    game_state = get_game_state(chat_id)
+    if not game_state["player_scores"]:
         return []
     
-    max_score = max(player_scores.values())
-    tied_players = [uid for uid, score in player_scores.items() if score == max_score]
+    max_score = max(game_state["player_scores"].values())
+    tied_players = [uid for uid, score in game_state["player_scores"].items() if score == max_score]
     
     return tied_players if len(tied_players) > 1 else []
 
 async def tiebreaker(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Admin command to start tiebreaker"""
-    global tiebreaker_state
-    
     if not update.message or not update.effective_user:
         return
         
@@ -363,18 +419,21 @@ async def tiebreaker(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Only admins can start tiebreaker.")
         return
     
-    if tiebreaker_state["in_progress"]:
+    chat_id = update.effective_chat.id
+    game_state = get_game_state(chat_id)
+    
+    if game_state["tiebreaker_state"]["in_progress"]:
         await update.message.reply_text("Tiebreaker already in progress.")
         return
     
-    tied_players = detect_tie()
+    tied_players = detect_tie(chat_id)
     if not tied_players:
         await update.message.reply_text("No tie detected. Cannot start tiebreaker.")
         return
     
-    tiebreaker_state["in_progress"] = True
-    tiebreaker_state["tied_players"] = tied_players
-    tiebreaker_state["current_phase"] = "speed_round"
+    game_state["tiebreaker_state"]["in_progress"] = True
+    game_state["tiebreaker_state"]["tied_players"] = tied_players
+    game_state["tiebreaker_state"]["current_phase"] = "speed_round"
     
     save_game_state()
     
@@ -388,75 +447,80 @@ async def tiebreaker(update: Update, context: ContextTypes.DEFAULT_TYPE):
             tied_names.append(f"User {uid}")
     
     await context.bot.send_message(
-        chat_id=group_chat_id,
+        chat_id=chat_id,
         text=f"🏆 **TIEBREAKER ROUND**\n\nTied players: {', '.join(tied_names)}\n\nStarting speed round..."
     )
     
-    await start_speed_round(context)
+    await start_speed_round(context, chat_id)
 
-async def start_speed_round(context: ContextTypes.DEFAULT_TYPE):
+async def start_speed_round(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
     """Start the speed round phase of tiebreaker"""
+    game_state = get_game_state(chat_id)
+    
     # Find tiebreaker MCQ questions
     tiebreaker_questions = [q for q in questions_data if q.get("is_tiebreaker") and q["type"] == "mcq"]
     
     if not tiebreaker_questions:
         await context.bot.send_message(
-            chat_id=group_chat_id,
+            chat_id=chat_id,
             text="No speed round questions available. Moving to paragraph phase..."
         )
-        await start_paragraph_tiebreaker(context)
+        await start_paragraph_tiebreaker(context, chat_id)
         return
     
     question = random.choice(tiebreaker_questions)
-    tiebreaker_state["speed_round_question"] = question
-    tiebreaker_state["waiting_for_speed_answer"] = True
-    tiebreaker_state["first_responder"] = None
+    game_state["tiebreaker_state"]["speed_round_question"] = question
+    game_state["tiebreaker_state"]["waiting_for_speed_answer"] = True
+    game_state["tiebreaker_state"]["first_responder"] = None
     
     # Format question
     options = question["options"]
     lettered_options = [f"{chr(97 + i)}) {opt}" for i, opt in enumerate(options)]
     question_text = f"⚡ **SPEED ROUND**\n{question['question']}\nOptions:\n" + "\n".join(lettered_options) + "\n\n**First correct answer wins!**"
     
-    msg = await context.bot.send_message(chat_id=group_chat_id, text=question_text, parse_mode="Markdown")
+    msg = await context.bot.send_message(chat_id=chat_id, text=question_text, parse_mode="Markdown")
     
     # Start 30-second timer
-    tiebreaker_state["speed_timer_task"] = asyncio.create_task(
-        handle_speed_round_timeout(context, msg.message_id, question_text)
+    game_state["tiebreaker_state"]["speed_timer_task"] = asyncio.create_task(
+        handle_speed_round_timeout(context, chat_id, msg.message_id, question_text)
     )
     
     save_game_state()
 
-async def handle_speed_round_timeout(context: ContextTypes.DEFAULT_TYPE, message_id: int, original_text: str):
+async def handle_speed_round_timeout(context: ContextTypes.DEFAULT_TYPE, chat_id: int, message_id: int, original_text: str):
     """Handle speed round timeout"""
+    game_state = get_game_state(chat_id)
     try:
-        await show_timer(context, group_chat_id, message_id, 30, original_text)
+        await show_timer(context, chat_id, message_id, 30, original_text)
         await asyncio.sleep(1)
         
-        if tiebreaker_state["waiting_for_speed_answer"]:
-            tiebreaker_state["waiting_for_speed_answer"] = False
+        if game_state["tiebreaker_state"]["waiting_for_speed_answer"]:
+            game_state["tiebreaker_state"]["waiting_for_speed_answer"] = False
             await context.bot.send_message(
-                chat_id=group_chat_id,
+                chat_id=chat_id,
                 text="⏰ Speed round time's up! No winner. Moving to paragraph phase..."
             )
-            await start_paragraph_tiebreaker(context)
+            await start_paragraph_tiebreaker(context, chat_id)
     except asyncio.CancelledError:
         pass
 
-async def start_paragraph_tiebreaker(context: ContextTypes.DEFAULT_TYPE):
+async def start_paragraph_tiebreaker(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
     """Start the paragraph phase of tiebreaker"""
+    game_state = get_game_state(chat_id)
+    
     # Find tiebreaker paragraph questions
     tiebreaker_questions = [q for q in questions_data if q.get("is_tiebreaker") and q["type"] == "paragraph"]
     
     if not tiebreaker_questions:
-        await declare_shared_winners(context)
+        await declare_shared_winners(context, chat_id)
         return
     
     question = random.choice(tiebreaker_questions)
-    tiebreaker_state["current_phase"] = "paragraph"
+    game_state["tiebreaker_state"]["current_phase"] = "paragraph"
     
     # Get tied player names
     tied_names = []
-    for uid in tiebreaker_state["tied_players"]:
+    for uid in game_state["tiebreaker_state"]["tied_players"]:
         try:
             user = await context.bot.get_chat(uid)
             tied_names.append(user.first_name)
@@ -465,13 +529,15 @@ async def start_paragraph_tiebreaker(context: ContextTypes.DEFAULT_TYPE):
     
     question_text = f"📝 **PARAGRAPH TIEBREAKER**\n\n{question['question']}\n\nTied players ({', '.join(tied_names)}), please submit your answers. Admin will judge the best response."
     
-    await context.bot.send_message(chat_id=group_chat_id, text=question_text, parse_mode="Markdown")
+    await context.bot.send_message(chat_id=chat_id, text=question_text, parse_mode="Markdown")
     save_game_state()
 
-async def declare_shared_winners(context: ContextTypes.DEFAULT_TYPE):
+async def declare_shared_winners(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
     """Declare shared winners when tiebreaker is exhausted"""
+    game_state = get_game_state(chat_id)
+    
     tied_names = []
-    for uid in tiebreaker_state["tied_players"]:
+    for uid in game_state["tiebreaker_state"]["tied_players"]:
         try:
             user = await context.bot.get_chat(uid)
             tied_names.append(user.first_name)
@@ -479,160 +545,167 @@ async def declare_shared_winners(context: ContextTypes.DEFAULT_TYPE):
             tied_names.append(f"User {uid}")
     
     await context.bot.send_message(
-        chat_id=group_chat_id,
+        chat_id=chat_id,
         text=f"🏆 **SHARED VICTORY!**\n\nCongratulations to our co-winners: {', '.join(tied_names)}\n\nThe prize will be split among the winners!"
     )
     
     # Reset tiebreaker state
-    tiebreaker_state["in_progress"] = False
+    game_state["tiebreaker_state"]["in_progress"] = False
     save_game_state()
 
-async def next_turn(context: ContextTypes.DEFAULT_TYPE):
-    global current_turn_index
+async def next_turn(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
+    game_state = get_game_state(chat_id)
 
-    if current_turn_index >= len(active_players):
+    if game_state["current_turn_index"] >= len(game_state["active_players"]):
         # Show leaderboard after each complete round
-        await show_leaderboard(context, is_final=False)
+        await show_leaderboard(context, chat_id, is_final=False)
         
         # Check if we should end the quiz or continue
-        if len(answered_questions) >= len(question_pool):
-            await end_quiz(context)
+        if len(game_state["answered_questions"]) >= len(question_pool):
+            await end_quiz(context, chat_id)
             return
         
         # Reset for next round
-        current_turn_index = 0
+        game_state["current_turn_index"] = 0
 
-    user_id = active_players[current_turn_index]
+    user_id = game_state["active_players"][game_state["current_turn_index"]]
     user = await context.bot.get_chat(user_id)
-    available = [k for k in question_pool if k not in answered_questions]
+    available = [k for k in question_pool if k not in game_state["answered_questions"]]
 
     if not available:
-        await end_quiz(context)
+        await end_quiz(context, chat_id)
         return
 
     mention = f"[{user.first_name}](tg://user?id={user.id})"
     await context.bot.send_message(
-        chat_id=group_chat_id,
+        chat_id=chat_id,
         text=f"Your turn, {mention}! Pick a number from {available}",
         parse_mode="Markdown"
     )
     save_game_state()
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global current_turn_index, waiting_for_mcq_answer, mcq_timer_task, review_state, tiebreaker_state
-
     if not update.message or not update.effective_user:
         return
 
+    chat_id = update.effective_chat.id
+    game_state = get_game_state(chat_id)
+    user_data = get_user_data(chat_id, update.effective_user.id)
+
     # Handle tiebreaker speed round answers
-    if tiebreaker_state["waiting_for_speed_answer"] and update.effective_user.id in tiebreaker_state["tied_players"]:
+    if game_state["tiebreaker_state"]["waiting_for_speed_answer"] and update.effective_user.id in game_state["tiebreaker_state"]["tied_players"]:
         await handle_speed_round_answer(update, context)
         return
 
     # Handle tiebreaker paragraph answers
-    if tiebreaker_state["in_progress"] and tiebreaker_state["current_phase"] == "paragraph" and update.effective_user.id in tiebreaker_state["tied_players"]:
+    if game_state["tiebreaker_state"]["in_progress"] and game_state["tiebreaker_state"]["current_phase"] == "paragraph" and update.effective_user.id in game_state["tiebreaker_state"]["tied_players"]:
         await handle_tiebreaker_paragraph(update, context)
         return
 
-    if not in_progress:
+    if not game_state["in_progress"]:
         return
 
     # Handle MCQ answers
-    if waiting_for_mcq_answer and update.effective_user.id == context.user_data.get("responding_to"):
+    if game_state["waiting_for_mcq_answer"] and update.effective_user.id == user_data.get("responding_to"):
         # Cancel the timer since user answered
-        if mcq_timer_task and not mcq_timer_task.done():
-            mcq_timer_task.cancel()
+        if game_state["mcq_timer_task"] and not game_state["mcq_timer_task"].done():
+            game_state["mcq_timer_task"].cancel()
         
         await check_mcq_answer(update, context)
-        waiting_for_mcq_answer = False
-        current_turn_index += 1
+        game_state["waiting_for_mcq_answer"] = False
+        game_state["current_turn_index"] += 1
         save_game_state()
-        await next_turn(context)
+        await next_turn(context, chat_id)
         return
 
     # Handle paragraph answers
-    if context.user_data.get("waiting_for_paragraph") and update.effective_user.id == context.user_data.get("responding_to"):
+    if user_data.get("waiting_for_paragraph") and update.effective_user.id == user_data.get("responding_to"):
         # Cancel the paragraph timer since user answered
-        if context.user_data.get("paragraph_timer_task") and not context.user_data["paragraph_timer_task"].done():
-            context.user_data["paragraph_timer_task"].cancel()
+        if user_data.get("paragraph_timer_task") and not user_data["paragraph_timer_task"].done():
+            user_data["paragraph_timer_task"].cancel()
         
-        # Store answer in global review state
-        review_state["paragraph_answer"] = update.message.text
-        review_state["responding_user_id"] = update.effective_user.id
-        review_state["awaiting_admin_review"] = True
+        # Store answer in review state
+        game_state["review_state"]["paragraph_answer"] = update.message.text
+        game_state["review_state"]["responding_user_id"] = update.effective_user.id
+        game_state["review_state"]["awaiting_admin_review"] = True
         
-        context.user_data["waiting_for_paragraph"] = False
+        user_data["waiting_for_paragraph"] = False
         save_game_state()
         
         # Send to admin for review
         await context.bot.send_message(
-            chat_id=group_chat_id,
+            chat_id=chat_id,
             text=f"Admin, please review {update.effective_user.first_name}'s answer: \"{update.message.text}\"\n\nReply with /approve or /reject."
         )
         return
 
     # Handle question selection (only if it's the user's turn and we're not waiting for an answer)
-    if update.effective_user.id != active_players[current_turn_index] or waiting_for_mcq_answer:
+    if (game_state["current_turn_index"] >= len(game_state["active_players"]) or 
+        update.effective_user.id != game_state["active_players"][game_state["current_turn_index"]] or 
+        game_state["waiting_for_mcq_answer"]):
         return
 
     chosen = update.message.text.strip()
-    if chosen not in question_pool or chosen in answered_questions:
-        await context.bot.send_message(chat_id=group_chat_id, text="Invalid or already used number. Try again.")
+    if chosen not in question_pool or chosen in game_state["answered_questions"]:
+        await context.bot.send_message(chat_id=chat_id, text="Invalid or already used number. Try again.")
         return
 
     question = question_pool[chosen]
-    answered_questions.add(chosen)
+    game_state["answered_questions"].add(chosen)
 
     if question["type"] == "mcq":
         options = question["options"]
         lettered_options = [f"{chr(97 + i)}) {opt}" for i, opt in enumerate(options)]
         question_text = f"{question['question']}\nOptions:\n" + "\n".join(lettered_options)
-        msg = await context.bot.send_message(chat_id=group_chat_id, text=question_text)
+        msg = await context.bot.send_message(chat_id=chat_id, text=question_text)
         
         # Set up answer checking data
-        context.user_data["current_answer"] = question["answer"].strip().lower()
-        context.user_data["options_map"] = {
+        user_data["current_answer"] = question["answer"].strip().lower()
+        user_data["options_map"] = {
             chr(97 + i): opt.strip().lower() for i, opt in enumerate(options)
         }
         # Also include uppercase letters for user input flexibility
-        context.user_data["options_map"].update({
+        user_data["options_map"].update({
             chr(65 + i): opt.strip().lower() for i, opt in enumerate(options)
         })
-        context.user_data["responding_to"] = update.effective_user.id
+        user_data["responding_to"] = update.effective_user.id
         
         # Set state to wait for MCQ answer
-        waiting_for_mcq_answer = True
+        game_state["waiting_for_mcq_answer"] = True
         
         # Start timer
-        mcq_timer_task = asyncio.create_task(handle_mcq_timeout(context, msg.message_id, question_text))
+        game_state["mcq_timer_task"] = asyncio.create_task(handle_mcq_timeout(context, chat_id, msg.message_id, question_text))
 
     elif question["type"] == "paragraph":
         question_text = f"{question['question']} (You have 30 seconds to respond.)"
-        msg = await context.bot.send_message(chat_id=group_chat_id, text=question_text)
+        msg = await context.bot.send_message(chat_id=chat_id, text=question_text)
         
         # Set up paragraph answer waiting
-        context.user_data["waiting_for_paragraph"] = True
-        context.user_data["responding_to"] = update.effective_user.id
+        user_data["waiting_for_paragraph"] = True
+        user_data["responding_to"] = update.effective_user.id
         
         # Start paragraph timer
-        context.user_data["paragraph_timer_task"] = asyncio.create_task(
-            handle_paragraph_timeout(context, msg.message_id, question_text)
+        user_data["paragraph_timer_task"] = asyncio.create_task(
+            handle_paragraph_timeout(context, chat_id, msg.message_id, question_text)
         )
     
     save_game_state()
 
 async def handle_speed_round_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle speed round answer during tiebreaker"""
-    if not tiebreaker_state["waiting_for_speed_answer"]:
+    chat_id = update.effective_chat.id
+    game_state = get_game_state(chat_id)
+    
+    if not game_state["tiebreaker_state"]["waiting_for_speed_answer"]:
         return
     
-    question = tiebreaker_state["speed_round_question"]
+    question = game_state["tiebreaker_state"]["speed_round_question"]
     user = update.effective_user
     user_response = update.message.text.strip()
     
     # Cancel timer
-    if tiebreaker_state["speed_timer_task"] and not tiebreaker_state["speed_timer_task"].done():
-        tiebreaker_state["speed_timer_task"].cancel()
+    if game_state["tiebreaker_state"]["speed_timer_task"] and not game_state["tiebreaker_state"]["speed_timer_task"].done():
+        game_state["tiebreaker_state"]["speed_timer_task"].cancel()
     
     # Check answer
     correct_answer = question["answer"].strip().lower()
@@ -649,79 +722,97 @@ async def handle_speed_round_answer(update: Update, context: ContextTypes.DEFAUL
     
     if interpreted_response == correct_answer:
         # Winner found!
-        tiebreaker_state["waiting_for_speed_answer"] = False
-        tiebreaker_state["in_progress"] = False
+        game_state["tiebreaker_state"]["waiting_for_speed_answer"] = False
+        game_state["tiebreaker_state"]["in_progress"] = False
         
         await context.bot.send_message(
-            chat_id=group_chat_id,
+            chat_id=chat_id,
             text=f"🏆 **TIEBREAKER WINNER!**\n\n{user.first_name} answered correctly first and wins the quiz!"
         )
         save_game_state()
     else:
         await context.bot.send_message(
-            chat_id=group_chat_id,
+            chat_id=chat_id,
             text=f"❌ {user.first_name}, that's incorrect. Keep trying!"
         )
 
 async def handle_tiebreaker_paragraph(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle paragraph answer during tiebreaker"""
+    chat_id = update.effective_chat.id
     await context.bot.send_message(
-        chat_id=group_chat_id,
+        chat_id=chat_id,
         text=f"📝 {update.effective_user.first_name}'s tiebreaker answer received: \"{update.message.text}\"\n\nAdmin can use /approve {update.effective_user.first_name} to declare them the winner, or wait for other answers."
     )
 
-async def handle_paragraph_timeout(context: ContextTypes.DEFAULT_TYPE, message_id: int, original_text: str):
+async def handle_paragraph_timeout(context: ContextTypes.DEFAULT_TYPE, chat_id: int, message_id: int, original_text: str):
     """Handle paragraph timeout"""
-    global current_turn_index
+    game_state = get_game_state(chat_id)
     try:
-        await show_timer(context, group_chat_id, message_id, 30, original_text)
+        await show_timer(context, chat_id, message_id, 30, original_text)
         await asyncio.sleep(1)
         
-        if context.user_data.get("waiting_for_paragraph"):
-            context.user_data["waiting_for_paragraph"] = False
-            user_id = context.user_data.get("responding_to")
-            if user_id:
-                user = await context.bot.get_chat(user_id)
-                await context.bot.send_message(
-                    chat_id=group_chat_id, 
-                    text=f"⏰ Time's up, {user.first_name}! Moving to next turn."
-                )
-            
-            current_turn_index += 1
-            save_game_state()
-            await next_turn(context)
+        # Find the user who was supposed to answer
+        current_user_id = None
+        for user_id, user_data in game_state["user_data"].items():
+            if user_data.get("waiting_for_paragraph"):
+                current_user_id = user_id
+                user_data["waiting_for_paragraph"] = False
+                break
+        
+        if current_user_id:
+            user = await context.bot.get_chat(current_user_id)
+            await context.bot.send_message(
+                chat_id=chat_id, 
+                text=f"⏰ Time's up, {user.first_name}! Moving to next turn."
+            )
+        
+        game_state["current_turn_index"] += 1
+        save_game_state()
+        await next_turn(context, chat_id)
     except asyncio.CancelledError:
         pass
 
-async def handle_mcq_timeout(context: ContextTypes.DEFAULT_TYPE, message_id: int, original_text: str):
+async def handle_mcq_timeout(context: ContextTypes.DEFAULT_TYPE, chat_id: int, message_id: int, original_text: str):
     """Handle MCQ timeout"""
-    global waiting_for_mcq_answer, current_turn_index
+    game_state = get_game_state(chat_id)
     try:
-        await show_timer(context, group_chat_id, message_id, 30, original_text)
+        await show_timer(context, chat_id, message_id, 30, original_text)
         await asyncio.sleep(1)
         
-        if waiting_for_mcq_answer:
-            waiting_for_mcq_answer = False
-            user_id = context.user_data.get("responding_to")
-            if user_id:
-                user = await context.bot.get_chat(user_id)
-                correct_answer = context.user_data.get("current_answer", "")
+        if game_state["waiting_for_mcq_answer"]:
+            game_state["waiting_for_mcq_answer"] = False
+            
+            # Find the user who was supposed to answer
+            current_user_id = None
+            correct_answer = ""
+            for user_id, user_data in game_state["user_data"].items():
+                if user_data.get("responding_to") == user_id:
+                    current_user_id = user_id
+                    correct_answer = user_data.get("current_answer", "")
+                    break
+            
+            if current_user_id:
+                user = await context.bot.get_chat(current_user_id)
                 await context.bot.send_message(
-                    chat_id=group_chat_id, 
+                    chat_id=chat_id, 
                     text=f"⏰ Time's up, {user.first_name}! The correct answer was: {correct_answer}"
                 )
             
-            current_turn_index += 1
+            game_state["current_turn_index"] += 1
             save_game_state()
-            await next_turn(context)
+            await next_turn(context, chat_id)
     except asyncio.CancelledError:
         pass
 
 async def check_mcq_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    game_state = get_game_state(chat_id)
+    user_data = get_user_data(chat_id, update.effective_user.id)
+    
     user = update.effective_user
     user_id = user.id
-    correct_answer = context.user_data.get("current_answer", "").strip().lower()
-    options_map = context.user_data.get("options_map", {})
+    correct_answer = user_data.get("current_answer", "").strip().lower()
+    options_map = user_data.get("options_map", {})
     user_response = update.message.text.strip()
 
     # Normalize user response - remove whitespace and convert to lowercase
@@ -735,10 +826,10 @@ async def check_mcq_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         interpreted_response = normalized_response
 
     if interpreted_response == correct_answer:
-        player_scores[user_id] += 1
-        await context.bot.send_message(chat_id=group_chat_id, text=f"✅ {user.first_name}, that's correct!")
+        game_state["player_scores"][user_id] += 1
+        await context.bot.send_message(chat_id=chat_id, text=f"✅ {user.first_name}, that's correct!")
     else:
-        await context.bot.send_message(chat_id=group_chat_id, text=f"❌ {user.first_name}, that's incorrect. The correct answer was: {correct_answer}")
+        await context.bot.send_message(chat_id=chat_id, text=f"❌ {user.first_name}, that's incorrect. The correct answer was: {correct_answer}")
 
 async def show_timer(context: ContextTypes.DEFAULT_TYPE, chat_id: int, message_id: int, duration: int, original_text: str):
     for remaining in range(duration, 0, -10):
@@ -754,26 +845,25 @@ async def show_timer(context: ContextTypes.DEFAULT_TYPE, chat_id: int, message_i
         text=f"{original_text}\n\n⏰ Time's up!"
     )
 
-async def show_leaderboard(context: ContextTypes.DEFAULT_TYPE, is_final=False):
+async def show_leaderboard(context: ContextTypes.DEFAULT_TYPE, chat_id: int, is_final=False):
     """Show current leaderboard"""
-    if not group_chat_id:
-        return
-        
-    leaderboard = sorted(player_scores.items(), key=lambda x: x[1], reverse=True)
+    game_state = get_game_state(chat_id)
+    
+    leaderboard = sorted(game_state["player_scores"].items(), key=lambda x: x[1], reverse=True)
     title = "🏆 Final Leaderboard:" if is_final else "📊 Current Leaderboard:"
     result = [title]
     for i, (uid, score) in enumerate(leaderboard):
         name = (await context.bot.get_chat(uid)).first_name
         result.append(f"{i+1}. {name} — {score} point(s)")
-    await context.bot.send_message(chat_id=group_chat_id, text="\n".join(result))
+    await context.bot.send_message(chat_id=chat_id, text="\n".join(result))
 
-async def end_quiz(context: ContextTypes.DEFAULT_TYPE):
-    global in_progress
-    in_progress = False
-    await show_leaderboard(context, is_final=True)
+async def end_quiz(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
+    game_state = get_game_state(chat_id)
+    game_state["in_progress"] = False
+    await show_leaderboard(context, chat_id, is_final=True)
     
     # Check for tie
-    tied_players = detect_tie()
+    tied_players = detect_tie(chat_id)
     if tied_players:
         tied_names = []
         for uid in tied_players:
@@ -784,15 +874,13 @@ async def end_quiz(context: ContextTypes.DEFAULT_TYPE):
                 tied_names.append(f"User {uid}")
         
         await context.bot.send_message(
-            chat_id=group_chat_id,
+            chat_id=chat_id,
             text=f"🤝 **TIE DETECTED!**\n\nTied players: {', '.join(tied_names)}\n\nAdmin can use /tiebreaker to start tiebreaker rounds."
         )
     
     save_game_state()
 
 async def approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global review_state, current_turn_index, tiebreaker_state
-    
     if not update.message or not update.effective_user:
         return
     
@@ -800,15 +888,18 @@ async def approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Only admins can approve answers.")
         return
     
+    chat_id = update.effective_chat.id
+    game_state = get_game_state(chat_id)
+    
     # Handle tiebreaker paragraph approval
-    if tiebreaker_state["in_progress"] and tiebreaker_state["current_phase"] == "paragraph":
+    if game_state["tiebreaker_state"]["in_progress"] and game_state["tiebreaker_state"]["current_phase"] == "paragraph":
         # Extract player name from command if provided (e.g., "/approve John")
         command_parts = update.message.text.split()
         if len(command_parts) > 1:
             winner_name = " ".join(command_parts[1:])
             # Find player by name
             winner_id = None
-            for uid in tiebreaker_state["tied_players"]:
+            for uid in game_state["tiebreaker_state"]["tied_players"]:
                 try:
                     user = await context.bot.get_chat(uid)
                     if user.first_name.lower() == winner_name.lower():
@@ -818,10 +909,10 @@ async def approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     continue
             
             if winner_id:
-                tiebreaker_state["in_progress"] = False
+                game_state["tiebreaker_state"]["in_progress"] = False
                 user = await context.bot.get_chat(winner_id)
                 await context.bot.send_message(
-                    chat_id=group_chat_id,
+                    chat_id=chat_id,
                     text=f"🏆 **TIEBREAKER WINNER!**\n\n{user.first_name} wins the quiz!"
                 )
                 save_game_state()
@@ -834,34 +925,32 @@ async def approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
     
     # Handle regular paragraph approval
-    if not review_state["awaiting_admin_review"]:
+    if not game_state["review_state"]["awaiting_admin_review"]:
         await update.message.reply_text("No answer is currently awaiting review.")
         return
         
-    user_id = review_state["responding_user_id"]
+    user_id = game_state["review_state"]["responding_user_id"]
     if not user_id:
         await update.message.reply_text("Error: No user found for this review.")
         return
         
-    player_scores[user_id] += 1
+    game_state["player_scores"][user_id] += 1
     user = await context.bot.get_chat(user_id)
-    await context.bot.send_message(chat_id=group_chat_id, text=f"✅ {user.first_name}'s answer has been approved.")
+    await context.bot.send_message(chat_id=chat_id, text=f"✅ {user.first_name}'s answer has been approved.")
     
     # Clear review state
-    review_state = {
+    game_state["review_state"] = {
         "awaiting_admin_review": False,
         "responding_user_id": None,
         "paragraph_answer": None
     }
     
     # Move to next turn
-    current_turn_index += 1
+    game_state["current_turn_index"] += 1
     save_game_state()
-    await next_turn(context)
+    await next_turn(context, chat_id)
 
 async def reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global review_state, current_turn_index
-    
     if not update.message or not update.effective_user:
         return
     
@@ -869,29 +958,32 @@ async def reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Only admins can reject answers.")
         return
     
-    if not review_state["awaiting_admin_review"]:
+    chat_id = update.effective_chat.id
+    game_state = get_game_state(chat_id)
+    
+    if not game_state["review_state"]["awaiting_admin_review"]:
         await update.message.reply_text("No answer is currently awaiting review.")
         return
         
-    user_id = review_state["responding_user_id"]
+    user_id = game_state["review_state"]["responding_user_id"]
     if not user_id:
         await update.message.reply_text("Error: No user found for this review.")
         return
         
     user = await context.bot.get_chat(user_id)
-    await context.bot.send_message(chat_id=group_chat_id, text=f"❌ {user.first_name}'s answer has been rejected.")
+    await context.bot.send_message(chat_id=chat_id, text=f"❌ {user.first_name}'s answer has been rejected.")
     
     # Clear review state
-    review_state = {
+    game_state["review_state"] = {
         "awaiting_admin_review": False,
         "responding_user_id": None,
         "paragraph_answer": None
     }
     
     # Move to next turn
-    current_turn_index += 1
+    game_state["current_turn_index"] += 1
     save_game_state()
-    await next_turn(context)
+    await next_turn(context, chat_id)
 
 if __name__ == "__main__":
     app = ApplicationBuilder().token(BOT_TOKEN).build()
