@@ -24,6 +24,13 @@ group_chat_id = None
 waiting_for_mcq_answer = False  # New state variable
 mcq_timer_task = None  # To store the timer task
 
+# Global review state (shared across all users)
+review_state = {
+    "awaiting_admin_review": False,
+    "responding_user_id": None,
+    "paragraph_answer": None
+}
+
 # Load questions from JSON
 def load_questions():
     with open(QUESTIONS_FILE, "r", encoding="utf-8") as f:
@@ -46,7 +53,7 @@ async def join(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("The quiz is already in progress. Wait for the next one.")
 
 async def begin(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global in_progress, current_turn_index, answered_questions, group_chat_id
+    global in_progress, current_turn_index, answered_questions, group_chat_id, review_state
     if update.effective_user.id != ADMIN_ID:
         await update.message.reply_text("Only the host can start the quiz.")
         return
@@ -59,12 +66,19 @@ async def begin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     in_progress = True
     current_turn_index = 0
     answered_questions = set()
+    
+    # Reset review state
+    review_state = {
+        "awaiting_admin_review": False,
+        "responding_user_id": None,
+        "paragraph_answer": None
+    }
 
     await context.bot.send_message(chat_id=group_chat_id, text="Quiz starting now!")
     await next_turn(context)
 
 async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global in_progress, active_players, player_scores, current_turn_index, answered_questions, waiting_for_mcq_answer, mcq_timer_task
+    global in_progress, active_players, player_scores, current_turn_index, answered_questions, waiting_for_mcq_answer, mcq_timer_task, review_state
     if update.effective_user.id != ADMIN_ID:
         await update.message.reply_text("Only the host can stop the quiz.")
         return
@@ -83,6 +97,14 @@ async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     player_scores.clear()
     answered_questions.clear()
     current_turn_index = 0
+    
+    # Reset review state
+    review_state = {
+        "awaiting_admin_review": False,
+        "responding_user_id": None,
+        "paragraph_answer": None
+    }
+    
     await context.bot.send_message(chat_id=group_chat_id, text="Quiz has been stopped.")
 
 async def next_turn(context: ContextTypes.DEFAULT_TYPE):
@@ -108,7 +130,7 @@ async def next_turn(context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global current_turn_index, waiting_for_mcq_answer, mcq_timer_task
+    global current_turn_index, waiting_for_mcq_answer, mcq_timer_task, review_state
 
     if not in_progress:
         return
@@ -131,7 +153,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if context.user_data.get("paragraph_timer_task") and not context.user_data["paragraph_timer_task"].done():
             context.user_data["paragraph_timer_task"].cancel()
         
-        context.user_data["paragraph_answer"] = update.message.text
+        # Store answer in global review state instead of user_data
+        review_state["paragraph_answer"] = update.message.text
+        review_state["responding_user_id"] = update.effective_user.id
+        review_state["awaiting_admin_review"] = True
+        
         context.user_data["waiting_for_paragraph"] = False
         
         # Send to admin for review
@@ -139,7 +165,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             chat_id=group_chat_id,
             text=f"Admin, please review {update.effective_user.first_name}'s answer: \"{update.message.text}\"\n\nReply with /approve or /reject."
         )
-        context.user_data["awaiting_admin_review"] = True
         return
 
     # Handle question selection (only if it's the user's turn and we're not waiting for an answer)
@@ -183,7 +208,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # Set up paragraph answer waiting
         context.user_data["waiting_for_paragraph"] = True
-        context.user_data["paragraph_answer"] = ""
         context.user_data["responding_to"] = update.effective_user.id
         
         # Start paragraph timer
@@ -288,15 +312,17 @@ async def end_quiz(context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(chat_id=group_chat_id, text="\n".join(result))
 
 async def approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global review_state, current_turn_index
+    
     if update.effective_user.id != ADMIN_ID:
         await update.message.reply_text("Only the admin can approve answers.")
         return
     
-    if not context.user_data.get("awaiting_admin_review"):
+    if not review_state["awaiting_admin_review"]:
         await update.message.reply_text("No answer is currently awaiting review.")
         return
         
-    user_id = context.user_data.get("responding_to")
+    user_id = review_state["responding_user_id"]
     if not user_id:
         await update.message.reply_text("Error: No user found for this review.")
         return
@@ -306,24 +332,28 @@ async def approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(chat_id=group_chat_id, text=f"✅ {user.first_name}'s answer has been approved.")
     
     # Clear review state
-    context.user_data["awaiting_admin_review"] = False
-    context.user_data["responding_to"] = None
+    review_state = {
+        "awaiting_admin_review": False,
+        "responding_user_id": None,
+        "paragraph_answer": None
+    }
     
     # Move to next turn
-    global current_turn_index
     current_turn_index += 1
     await next_turn(context)
 
 async def reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global review_state, current_turn_index
+    
     if update.effective_user.id != ADMIN_ID:
         await update.message.reply_text("Only the admin can reject answers.")
         return
     
-    if not context.user_data.get("awaiting_admin_review"):
+    if not review_state["awaiting_admin_review"]:
         await update.message.reply_text("No answer is currently awaiting review.")
         return
         
-    user_id = context.user_data.get("responding_to")
+    user_id = review_state["responding_user_id"]
     if not user_id:
         await update.message.reply_text("Error: No user found for this review.")
         return
@@ -332,11 +362,13 @@ async def reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(chat_id=group_chat_id, text=f"❌ {user.first_name}'s answer has been rejected.")
     
     # Clear review state
-    context.user_data["awaiting_admin_review"] = False
-    context.user_data["responding_to"] = None
+    review_state = {
+        "awaiting_admin_review": False,
+        "responding_user_id": None,
+        "paragraph_answer": None
+    }
     
     # Move to next turn
-    global current_turn_index
     current_turn_index += 1
     await next_turn(context)
 
