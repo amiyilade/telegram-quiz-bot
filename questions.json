@@ -14,5 +14,77 @@
     "type": "paragraph",
     "question": "Briefly explain the significance of the resurrection of Jesus.",
     "answer": "open-ended"
+  },
+  {
+    "type": "mcq",
+    "question": "Test A",
+    "answer": "open-ended",
+    "is_tiebreaker": true
+  },
+  {
+    "type": "mcq",
+    "question": "Test B",
+    "answer": "open-ended",
+    "is_tiebreaker": true
+  },
+  {
+    "type": "mcq",
+    "question": "Test C",
+    "answer": "open-ended",
+    "is_tiebreaker": true
+  },
+  {
+    "type": "mcq",
+    "question": "Test D",
+    "answer": "open-ended",
+    "is_tiebreaker": true
+  },
+  {
+    "type": "mcq",
+    "question": "Test 1",
+    "options": [
+      "Q",
+      "R",
+      "S",
+      "T"
+    ],
+    "answer": "R",
+    "is_tiebreaker": true
+  },
+  {
+    "type": "mcq",
+    "question": "Test 2",
+    "options": [
+      "U",
+      "V",
+      "W",
+      "X"
+    ],
+    "answer": "V",
+    "is_tiebreaker": true
+  },
+  {
+    "type": "mcq",
+    "question": "Test 3",
+    "options": [
+      "Y",
+      "Z",
+      "A",
+      "B"
+    ],
+    "answer": "Z",
+    "is_tiebreaker": true
+  },
+  {
+    "type": "mcq",
+    "question": "Test 4",
+    "options": [
+      "C",
+      "D",
+      "E",
+      "F"
+    ],
+    "answer": "D",
+    "is_tiebreaker": true
   }
 ]
