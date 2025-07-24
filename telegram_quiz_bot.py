@@ -40,9 +40,13 @@ questions_data = load_questions()
 question_pool = {str(i+1): q for i, q in enumerate(questions_data)}
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message:
+        return
     await update.message.reply_text("Welcome to the Bible Study Quiz! Type /join to participate.")
 
 async def join(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message or not update.effective_user:
+        return
     user = update.effective_user
     global in_progress
     if user.id not in active_players and not in_progress:
@@ -54,6 +58,8 @@ async def join(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def begin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global in_progress, current_turn_index, answered_questions, group_chat_id, review_state
+    if not update.message or not update.effective_user:
+        return
     if update.effective_user.id != ADMIN_ID:
         await update.message.reply_text("Only the host can start the quiz.")
         return
@@ -139,6 +145,9 @@ async def next_turn(context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global current_turn_index, waiting_for_mcq_answer, mcq_timer_task, review_state
+
+    if not update.message or not update.effective_user:
+        return
 
     if not in_progress:
         return
@@ -311,6 +320,9 @@ async def show_timer(context: ContextTypes.DEFAULT_TYPE, chat_id: int, message_i
 
 async def show_leaderboard(context: ContextTypes.DEFAULT_TYPE, is_final=False):
     """Show current leaderboard"""
+    if not group_chat_id:
+        return  # Can't show leaderboard if no group chat is set
+        
     leaderboard = sorted(player_scores.items(), key=lambda x: x[1], reverse=True)
     title = "🏆 Final Leaderboard:" if is_final else "📊 Current Leaderboard:"
     result = [title]
@@ -326,6 +338,9 @@ async def end_quiz(context: ContextTypes.DEFAULT_TYPE):
 
 async def approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global review_state, current_turn_index
+    
+    if not update.message or not update.effective_user:
+        return
     
     if update.effective_user.id != ADMIN_ID:
         await update.message.reply_text("Only the admin can approve answers.")
@@ -357,6 +372,9 @@ async def approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global review_state, current_turn_index
+    
+    if not update.message or not update.effective_user:
+        return
     
     if update.effective_user.id != ADMIN_ID:
         await update.message.reply_text("Only the admin can reject answers.")
