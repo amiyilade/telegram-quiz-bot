@@ -16,25 +16,25 @@
     "answer": "open-ended"
   },
   {
-    "type": "mcq",
+    "type": "mcqparagraph",
     "question": "Test A",
     "answer": "open-ended",
     "is_tiebreaker": true
   },
   {
-    "type": "mcq",
+    "type": "paragraph",
     "question": "Test B",
     "answer": "open-ended",
     "is_tiebreaker": true
   },
   {
-    "type": "mcq",
+    "type": "paragraph",
     "question": "Test C",
     "answer": "open-ended",
     "is_tiebreaker": true
   },
   {
-    "type": "mcq",
+    "type": "paragraph",
     "question": "Test D",
     "answer": "open-ended",
     "is_tiebreaker": true
