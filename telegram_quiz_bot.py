@@ -104,8 +104,13 @@ def load_questions():
     with open(QUESTIONS_FILE, "r", encoding="utf-8") as f:
         return json.load(f)
 
+def build_regular_question_pool():
+    """Build question pool excluding tiebreaker questions"""
+    regular_questions = [q for q in questions_data if not q.get("is_tiebreaker", False)]
+    return {str(i+1): q for i, q in enumerate(regular_questions)}
+
 questions_data = load_questions()
-question_pool = {str(i+1): q for i, q in enumerate(questions_data)}
+question_pool = build_regular_question_pool()
 
 # Load game state on startup
 load_game_state()
@@ -129,7 +134,7 @@ async def join(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("The quiz is already in progress. Wait for the next one.")
 
 async def begin(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global in_progress, current_turn_index, answered_questions, group_chat_id, review_state, tiebreaker_state
+    global in_progress, current_turn_index, answered_questions, group_chat_id, review_state, tiebreaker_state, question_pool
     if not update.message or not update.effective_user:
         return
     if not is_admin(update.effective_user.id):
@@ -138,6 +143,13 @@ async def begin(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not active_players:
         await update.message.reply_text("No players have joined.")
+        return
+
+    # Rebuild question pool to exclude tiebreaker questions
+    question_pool = build_regular_question_pool()
+    
+    if not question_pool:
+        await update.message.reply_text("No regular questions available! Please add non-tiebreaker questions to the quiz.")
         return
 
     group_chat_id = update.effective_chat.id
