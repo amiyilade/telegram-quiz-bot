@@ -16,7 +16,29 @@
     "answer": "open-ended"
   },
   {
-    "type": "mcqparagraph",
+    "type": "mcq",
+    "question": "Who made the heavens?",
+    "options": [
+      "Moses",
+      "Abraham",
+      "God",
+      "Paul"
+    ],
+    "answer": "God"
+  },
+  {
+    "type": "mcq",
+    "question": "Who is Abraham's first wife?",
+    "options": [
+      "Hagar",
+      "Keturah",
+      "Sarah",
+      "Ruth"
+    ],
+    "answer": "Sarah"
+  },
+  {
+    "type": "paragraph",
     "question": "Test A",
     "answer": "open-ended",
     "is_tiebreaker": true
@@ -41,7 +63,7 @@
   },
   {
     "type": "mcq",
-    "question": "Test 1",
+    "question": "Test 1 (R)",
     "options": [
       "Q",
       "R",
@@ -53,7 +75,7 @@
   },
   {
     "type": "mcq",
-    "question": "Test 2",
+    "question": "Test 2 (V)",
     "options": [
       "U",
       "V",
@@ -65,7 +87,7 @@
   },
   {
     "type": "mcq",
-    "question": "Test 3",
+    "question": "Test 3 (Z)",
     "options": [
       "Y",
       "Z",
@@ -77,14 +99,14 @@
   },
   {
     "type": "mcq",
-    "question": "Test 4",
+    "question": "Test 4 (L)",
     "options": [
       "C",
-      "D",
+      "L",
       "E",
       "F"
     ],
-    "answer": "D",
+    "answer": "L",
     "is_tiebreaker": true
   }
 ]
