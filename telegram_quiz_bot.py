@@ -189,15 +189,31 @@ async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Only admins can stop the quiz.")
         return
 
-    # Cancel any running timers
+    # Cancel MCQ timer
     if mcq_timer_task and not mcq_timer_task.done():
         mcq_timer_task.cancel()
+        mcq_timer_task = None
     
+    # Cancel tiebreaker speed timer
     if tiebreaker_state.get("speed_timer_task") and not tiebreaker_state["speed_timer_task"].done():
         tiebreaker_state["speed_timer_task"].cancel()
     
+    # Cancel paragraph timer from context.user_data (this is the problematic one)
     if context.user_data.get("paragraph_timer_task") and not context.user_data["paragraph_timer_task"].done():
         context.user_data["paragraph_timer_task"].cancel()
+    
+    # Cancel any other timers that might be running
+    # We need to be more aggressive about cleaning up all possible timer references
+    try:
+        # Get all tasks and try to cancel any that might be related to our bot
+        import asyncio
+        for task in asyncio.all_tasks():
+            if not task.done() and hasattr(task, '_coro') and task._coro:
+                coro_name = getattr(task._coro, '__name__', '')
+                if coro_name in ['handle_mcq_timeout', 'handle_paragraph_timeout', 'handle_speed_round_timeout']:
+                    task.cancel()
+    except Exception as e:
+        print(f"Error cancelling tasks: {e}")
 
     in_progress = False
     waiting_for_mcq_answer = False
