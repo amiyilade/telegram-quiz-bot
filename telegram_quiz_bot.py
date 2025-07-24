@@ -111,8 +111,16 @@ async def next_turn(context: ContextTypes.DEFAULT_TYPE):
     global current_turn_index
 
     if current_turn_index >= len(active_players):
-        await end_quiz(context)
-        return
+        # Show leaderboard after each complete round
+        await show_leaderboard(context, is_final=False)
+        
+        # Check if we should end the quiz or continue
+        if len(answered_questions) >= len(question_pool):
+            await end_quiz(context)
+            return
+        
+        # Reset for next round
+        current_turn_index = 0
 
     user_id = active_players[current_turn_index]
     user = await context.bot.get_chat(user_id)
@@ -301,15 +309,20 @@ async def show_timer(context: ContextTypes.DEFAULT_TYPE, chat_id: int, message_i
         text=f"{original_text}\n\n⏰ Time's up!"
     )
 
-async def end_quiz(context: ContextTypes.DEFAULT_TYPE):
-    global in_progress
-    in_progress = False
+async def show_leaderboard(context: ContextTypes.DEFAULT_TYPE, is_final=False):
+    """Show current leaderboard"""
     leaderboard = sorted(player_scores.items(), key=lambda x: x[1], reverse=True)
-    result = ["\ud83c\udfc6 Final Leaderboard:"]
+    title = "🏆 Final Leaderboard:" if is_final else "📊 Current Leaderboard:"
+    result = [title]
     for i, (uid, score) in enumerate(leaderboard):
         name = (await context.bot.get_chat(uid)).first_name
         result.append(f"{i+1}. {name} — {score} point(s)")
     await context.bot.send_message(chat_id=group_chat_id, text="\n".join(result))
+
+async def end_quiz(context: ContextTypes.DEFAULT_TYPE):
+    global in_progress
+    in_progress = False
+    await show_leaderboard(context, is_final=True)
 
 async def approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global review_state, current_turn_index
