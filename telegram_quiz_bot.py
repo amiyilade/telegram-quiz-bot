@@ -585,7 +585,7 @@ async def next_turn(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
     if len(available) < len(game_state["active_players"]) - game_state["current_turn_index"]:
         await context.bot.send_message(
             chat_id=chat_id,
-            text="Questions have been exhausted. Quiz ends now!"
+            text="Not enough questions left for every remaining player. Quiz ends now!"
         )
         await end_quiz(context, chat_id)
         return
@@ -1000,6 +1000,62 @@ async def reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
     save_game_state()
     await next_turn(context, chat_id)
 
+async def remove_player(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """/remove <first_name|@username> — admin only"""
+    if not update.message or not update.effective_user:
+        return
+    if not is_admin(update.effective_user.id):
+        await update.message.reply_text("Only admins can remove players.")
+        return
+
+    chat_id = update.effective_chat.id
+    game_state = get_game_state(chat_id)
+    if not game_state["active_players"]:
+        await update.message.reply_text("No players in the game.")
+        return
+
+    # Extract the name/username to remove
+    if not context.args:
+        await update.message.reply_text("Usage: /remove <first_name|@username>")
+        return
+    target = " ".join(context.args).lstrip("@").lower()
+
+    # Find matching user
+    victim_id = None
+    for uid in game_state["active_players"]:
+        try:
+            user = await context.bot.get_chat(uid)
+            # compare first name OR username
+            if user.first_name.lower() == target or (user.username and user.username.lower() == target):
+                victim_id = uid
+                break
+        except Exception:
+            continue
+
+    if victim_id is None:
+        await update.message.reply_text(f"Player '{target}' not found.")
+        return
+
+    # ---- actual removal ----
+    game_state["active_players"].remove(victim_id)
+    game_state["player_scores"].pop(victim_id, None)
+    game_state["user_data"].pop(victim_id, None)
+
+    # If the removed player was the current turn, skip to next
+    if game_state["current_turn_index"] >= len(game_state["active_players"]):
+        game_state["current_turn_index"] = 0
+    save_game_state()
+
+    user = await context.bot.get_chat(victim_id)
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=f"🚫 {user.first_name} has been removed from the quiz."
+    )
+
+    # If game in progress, move to next turn
+    if game_state["in_progress"]:
+        await next_turn(context, chat_id)
+
 if __name__ == "__main__":
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
@@ -1011,5 +1067,6 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("tiebreaker", tiebreaker))
     app.add_handler(CommandHandler("approve", approve))
     app.add_handler(CommandHandler("reject", reject))
+    app.add_handler(CommandHandler("remove", remove_player))
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
     app.run_polling()
