@@ -47,6 +47,7 @@ def get_game_state(chat_id):
                 "first_responder": None,
                 "speed_timer_task": None
             },
+            "used_tiebreaker_mcq": set(),   # track already-asked speed-round questions
             "review_state": {
                 "awaiting_admin_review": False,
                 "responding_user_id": None,
@@ -454,37 +455,43 @@ async def tiebreaker(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await start_speed_round(context, chat_id)
 
 async def start_speed_round(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
-    """Start the speed round phase of tiebreaker"""
+    """Pick an *unused* tie-breaker MCQ; if none left → paragraph phase."""
     game_state = get_game_state(chat_id)
-    
-    # Find tiebreaker MCQ questions
-    tiebreaker_questions = [q for q in questions_data if q.get("is_tiebreaker") and q["type"] == "mcq"]
-    
-    if not tiebreaker_questions:
+
+    # 1. Collect *unused* MCQ questions
+    available = [
+        q for q in questions_data
+        if q.get("is_tiebreaker") and q["type"] == "mcq" and json.dumps(q) not in game_state["used_tiebreaker_mcq"]
+    ]
+
+    if not available:                       # <-- no more speed questions
         await context.bot.send_message(
             chat_id=chat_id,
-            text="No speed round questions available. Moving to paragraph phase..."
+            text="All speed-round questions exhausted. Moving to paragraph phase…"
         )
         await start_paragraph_tiebreaker(context, chat_id)
         return
-    
-    question = random.choice(tiebreaker_questions)
+
+    # 2. Pick & mark as used
+    question = random.choice(available)
+    game_state["used_tiebreaker_mcq"].add(json.dumps(question))  # JSON string is hashable
     game_state["tiebreaker_state"]["speed_round_question"] = question
     game_state["tiebreaker_state"]["waiting_for_speed_answer"] = True
     game_state["tiebreaker_state"]["first_responder"] = None
-    
-    # Format question
+
+    # 3. Send to group
     options = question["options"]
     lettered_options = [f"{chr(97 + i)}) {opt}" for i, opt in enumerate(options)]
-    question_text = f"⚡ **SPEED ROUND**\n{question['question']}\nOptions:\n" + "\n".join(lettered_options) + "\n\n**First correct answer wins!**"
-    
-    msg = await context.bot.send_message(chat_id=chat_id, text=question_text, parse_mode="Markdown")
-    
-    # Start 30-second timer
+    txt = (f"⚡ **SPEED ROUND** ({len(available)-1} left)\n"
+           f"{question['question']}\n" +
+           "\n".join(lettered_options) +
+           "\n\n**First correct answer wins!**")
+    msg = await context.bot.send_message(chat_id=chat_id, text=txt, parse_mode="Markdown")
+
+    # 4. Start 30-s timer
     game_state["tiebreaker_state"]["speed_timer_task"] = asyncio.create_task(
-        handle_speed_round_timeout(context, chat_id, msg.message_id, question_text)
+        handle_speed_round_timeout(context, chat_id, msg.message_id, txt)
     )
-    
     save_game_state()
 
 async def handle_speed_round_timeout(context: ContextTypes.DEFAULT_TYPE, chat_id: int, message_id: int, original_text: str):
