@@ -582,6 +582,14 @@ async def next_turn(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
     user = await context.bot.get_chat(user_id)
     available = [k for k in question_pool if k not in game_state["answered_questions"]]
 
+    if len(available) < len(game_state["active_players"]) - game_state["current_turn_index"]:
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text="Questions have been exhausted. Quiz ends now!"
+        )
+        await end_quiz(context, chat_id)
+        return
+
     if not available:
         await end_quiz(context, chat_id)
         return
