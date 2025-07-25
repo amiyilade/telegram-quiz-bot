@@ -412,8 +412,7 @@ def detect_tie(chat_id):
     return tied_players if len(tied_players) > 1 else []
 
 async def tiebreaker(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """to reset the new set when tiebreaker is called""""
-    game_state["used_tiebreaker_mcq"].clear() 
+    
     """Admin command to start tiebreaker"""
     if not update.message or not update.effective_user:
         return
@@ -434,6 +433,7 @@ async def tiebreaker(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("No tie detected. Cannot start tiebreaker.")
         return
     
+    game_state["used_tiebreaker_mcq"].clear() 
     game_state["tiebreaker_state"]["in_progress"] = True
     game_state["tiebreaker_state"]["tied_players"] = tied_players
     game_state["tiebreaker_state"]["current_phase"] = "speed_round"
