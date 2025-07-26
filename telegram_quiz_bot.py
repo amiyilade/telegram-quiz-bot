@@ -15,7 +15,7 @@ ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 BACKUP_ADMIN_IDS = [int(x.strip()) for x in os.getenv("BACKUP_ADMIN_IDS", "").split(",") if x.strip()]
 ALL_ADMIN_IDS = [ADMIN_ID] + BACKUP_ADMIN_IDS
 
-QUESTIONS_FILE = "questions.json"
+QUESTIONS_FILE = "tkh_questions.json"
 STATE_FILE = "game_states.pkl"
 
 # Global data structures
@@ -157,7 +157,7 @@ load_game_state()
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message:
         return
-    await update.message.reply_text("Welcome to the Bible Study Quiz! Type /join to participate.")
+    await update.message.reply_text("Welcome to the Bible Study Quiz! Type /join to participate. The admin will close entry soon.")
 
 async def join(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.effective_user:
