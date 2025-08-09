@@ -1,0 +1,796 @@
+[
+  {
+    "type": "mcq",
+    "question": "How old was Joseph when his brethren sold him into slavery?",
+    "options": [
+      "32",
+      "23",
+      "17",
+      "19"
+    ],
+    "answer": "17"
+  },
+  {
+    "type": "mcq",
+    "question": "How old was Moses when he gave God\u2019s message to Pharaoh: \u201cLet my people go\u201d?",
+    "options": [
+      "80 years",
+      "18 years",
+      "13 years",
+      "33 years"
+    ],
+    "answer": "80 years"
+  },
+  {
+    "type": "mcq",
+    "question": "When Saul was pursuing David, in which cave did David seek refuge?",
+    "options": [
+      "Cave at Makkedah",
+      "Cave of Machpelah",
+      "Cave of Adullam",
+      "Dambulla Cave"
+    ],
+    "answer": "Cave of Adullam"
+  },
+  {
+    "type": "mcq",
+    "question": "According to 2 Kings 19, what king was killed by his own sons?",
+    "options": [
+      "Manasseh",
+      "Sennacherib",
+      "Ahaz",
+      "Jotham"
+    ],
+    "answer": "Sennacherib"
+  },
+  {
+    "type": "mcq",
+    "question": "What aged prophet\u2019s hands were upheld by two persons and caused the armies of Israel to be victorious?",
+    "options": [
+      "Elisha",
+      "Elijah",
+      "Moses",
+      "Hosea"
+    ],
+    "answer": "Moses"
+  },
+  {
+    "type": "mcq",
+    "question": "What queen of Bible times is described by the epithet \u201cthat wicked woman\u201d?",
+    "options": [
+      "Gomer",
+      "Herodias",
+      "Athaliah",
+      "Jezebel"
+    ],
+    "answer": "Athaliah"
+  },
+  {
+    "type": "mcq",
+    "question": "In the stories of Samuel, which is not true?",
+    "options": [
+      "His mother was called Hannah",
+      "He anointed 3 kings of Israel: Joseph, Saul, and David",
+      "He succeeded the prophet Eli",
+      "He had a vision while he was still very young"
+    ],
+    "answer": "He anointed 3 kings of Israel: Joseph, Saul, and David"
+  },
+  {
+    "type": "mcq",
+    "question": "What was the name of the city founded by Cain after he left God's presence?",
+    "options": [
+      "Sodom",
+      "Gomorrah",
+      "Enoch",
+      "Canaan"
+    ],
+    "answer": "Enoch"
+  },
+  {
+    "type": "mcq",
+    "question": "Which of Jesus' parables talks about God's forgiveness?",
+    "options": [
+      "Parable of the Tares and the Wheat",
+      "Parable of the Ten Virgins",
+      "Parable of the Prodigal Son",
+      "Parable of the Good Samaritan",
+      "Parable of the Sower"
+    ],
+    "answer": "Parable of the Prodigal Son"
+  },
+  {
+    "type": "mcq",
+    "question": "Who was the wise woman who stopped David from destroying Nabal, her husband, and her house?",
+    "options": [
+      "Merab",
+      "Michal",
+      "Abigail",
+      "Bathsheba"
+    ],
+    "answer": "Abigail"
+  },
+  {
+    "type": "mcq",
+    "question": "Which prophet made the iron of an axe float?",
+    "options": [
+      "Elijah",
+      "Elisha",
+      "Isaiah",
+      "Ezekiel"
+    ],
+    "answer": "Elisha"
+  },
+  {
+    "type": "mcq",
+    "question": "Who resurrected a young man called Eutychus?",
+    "options": [
+      "Jesus",
+      "Peter",
+      "Philip",
+      "Paul",
+      "John"
+    ],
+    "answer": "Paul"
+  },
+  {
+    "type": "mcq",
+    "question": "Can this phrase be found in the Bible? 'Pride goes before destruction'",
+    "options": [
+      "Yes",
+      "No"
+    ],
+    "answer": "Yes"
+  },
+  {
+    "type": "paragraph",
+    "question": "Finish this proverb: 'Where there is no vision, . . . ;'",
+    "answer": "The people perish"
+  },
+  {
+    "type": "mcq",
+    "question": "Who delivered Israel by killing 600 Philistines with an ox goad?",
+    "options": [
+      "David",
+      "Jonathan",
+      "Shamgar",
+      "Samson"
+    ],
+    "answer": "Shamgar"
+  },
+  {
+    "type": "mcq",
+    "question": "Who heard Peter's voice at the door but failed to let him in?",
+    "options": [
+      "Martha",
+      "Priscilla",
+      "Lydia",
+      "Rhoda"
+    ],
+    "answer": "Rhoda"
+  },
+  {
+    "type": "mcq",
+    "question": "What was Priscilla's trade?",
+    "options": [
+      "Seller of purple fabric",
+      "Tent maker",
+      "Idol maker",
+      "Dressmaker"
+    ],
+    "answer": "Tent maker"
+  },
+  {
+    "type": "mcq",
+    "question": "Who suggested that Joseph interpret the dreams of Pharaoh?",
+    "options": [
+      "Potiphar",
+      "The cupbearer",
+      "Judah",
+      "The baker"
+    ],
+    "answer": "The cupbearer"
+  },
+  {
+    "type": "mcq",
+    "question": "What was the total number of the children of Israel that went down to Egypt with Jacob?",
+    "options": [
+      "1000",
+      "70",
+      "53",
+      "560"
+    ],
+    "answer": "70"
+  },
+  {
+    "type": "mcq",
+    "question": "What was Solomon\u2019s other name?",
+    "options": [
+      "Jedidiah",
+      "Hezekiah",
+      "Joab",
+      "Sylvester"
+    ],
+    "answer": "Jedidiah"
+  },
+  {
+    "type": "mcq",
+    "question": "Who partook of a meal prepared by an angel, and was sustained forty days and nights while in the mountain?",
+    "options": [
+      "Manoah",
+      "Joseph",
+      "Elijah",
+      "Moses"
+    ],
+    "answer": "Elijah"
+  },
+  {
+    "type": "mcq",
+    "question": "Who was the young woman who gave water to Eliezer and his camels in Mesopotamia?",
+    "options": [
+      "Milcah",
+      "Rachel",
+      "Ruth",
+      "Rebekah"
+    ],
+    "answer": "Rebekah"
+  },
+  {
+    "type": "mcq",
+    "question": "Hosea is to Gomer as Lapidoth is to",
+    "options": [
+      "Deborah",
+      "Anna",
+      "Keturah",
+      "Hagar"
+    ],
+    "answer": "Deborah"
+  },
+  {
+    "type": "mcq",
+    "question": "Who was David\u2019s son that started a rebellion against him?",
+    "options": [
+      "Absalom",
+      "Anna",
+      "Keturah",
+      "Hagar"
+    ],
+    "answer": "Absalom"
+  },
+  {
+    "type": "mcq",
+    "question": "True or False: Jesus was an only child of Joseph and Mary",
+    "options": [
+      "True",
+      "False"
+    ],
+    "answer": "False"
+  },
+  {
+    "type": "mcq",
+    "question": "Which book of the Bible tells the story of the Israelites' escape from Egypt?",
+    "options": [
+      "Genesis",
+      "Exodus",
+      "Leviticus",
+      "Numbers"
+    ],
+    "answer": "Exodus"
+  },
+  {
+    "type": "paragraph",
+    "question": "Complete the following, 'The light of the body is...'",
+    "answer": "The eye"
+  },
+  {
+    "type": "mcq",
+    "question": "A piece of his robe was cut off in a cave. To whom did it belong?",
+    "options": [
+      "Nathan",
+      "Saul",
+      "Samuel",
+      "Peter"
+    ],
+    "answer": "Saul"
+  },
+  {
+    "type": "mcq",
+    "question": "Who was Tola in the Bible?",
+    "options": [
+      "Judge",
+      "King",
+      "Prophet",
+      "Priest"
+    ],
+    "answer": "Judge"
+  },
+  {
+    "type": "mcq",
+    "question": "Who had his wages changed ten times?",
+    "options": [
+      "Jacob",
+      "David",
+      "Moses",
+      "Joseph"
+    ],
+    "answer": "Jacob"
+  },
+  {
+    "type": "mcq",
+    "question": "Moses saw the burning bush on Mount Ararat.",
+    "options": [
+      "True",
+      "False"
+    ],
+    "answer": "False"
+  },
+  {
+    "type": "mcq",
+    "question": "Blessed are the peacemakers, for",
+    "options": [
+      "They shall see God",
+      "Theirs is the kingdom of God",
+      "They shall know peace",
+      "They shall be called the sons of God"
+    ],
+    "answer": "They shall be called the sons of God"
+  },
+  {
+    "type": "mcq",
+    "question": "King Cyrus was ruler of which nation?",
+    "options": [
+      "Egypt",
+      "Babylon",
+      "Persia",
+      "Assyria"
+    ],
+    "answer": "Persia"
+  },
+  {
+    "type": "mcq",
+    "question": "Where did Jesus cure the blind Bartimaeus?",
+    "options": [
+      "Bethany",
+      "Jerusalem",
+      "Nazareth",
+      "Jericho"
+    ],
+    "answer": "Jericho"
+  },
+  {
+    "type": "paragraph",
+    "question": "We are to carry the shield of ...... (Fill in the blank)",
+    "answer": "Faith"
+  },
+  {
+    "type": "mcq",
+    "question": "Who was Agabus?",
+    "options": [
+      "King",
+      "Prophet",
+      "Apostle",
+      "Tax collector"
+    ],
+    "answer": "Prophet"
+  },
+  {
+    "type": "mcq",
+    "question": "Joseph, Reuben, Isaac and Levi. Who is the odd one out?",
+    "options": [
+      "Joseph",
+      "Reuben",
+      "Isaac",
+      "Levi"
+    ],
+    "answer": "Isaac"
+  },
+  {
+    "type": "mcq",
+    "question": "Abihu, Ithamar, Nadab and Phinehas. Who is the odd one out?",
+    "options": [
+      "Abihu",
+      "Ithamar",
+      "Phinehas",
+      "Nadab"
+    ],
+    "answer": "Phinehas"
+  },
+  {
+    "type": "mcq",
+    "question": "Apart from Jesus, who else walked on water?",
+    "options": [
+      "Nicodemus",
+      "Peter",
+      "Nathanael",
+      "Paul"
+    ],
+    "answer": "Peter"
+  },
+  {
+    "type": "mcq",
+    "question": "What was the name of Aaron\u2019s (Moses\u2019s brother) wife?",
+    "options": [
+      "Elisheba",
+      "Miriam",
+      "Zipporah",
+      "Deborah"
+    ],
+    "answer": "Elisheba"
+  },
+  {
+    "type": "mcq",
+    "question": "How many Philistines did Samson slay with a jaw bone?",
+    "options": [
+      "1,000",
+      "550",
+      "700",
+      "2,000"
+    ],
+    "answer": "1,000"
+  },
+  {
+    "type": "mcq",
+    "question": "What is the name of the city to which Lot escaped at the destruction of Sodom?",
+    "options": [
+      "Golon",
+      "Zoar",
+      "Silo",
+      "Cabul"
+    ],
+    "answer": "Zoar"
+  },
+  {
+    "type": "mcq",
+    "question": "As for me and my household, we will serve the LORD. Who said these words?",
+    "options": [
+      "Moses",
+      "Paul",
+      "Gideon",
+      "Joshua"
+    ],
+    "answer": "Joshua"
+  },
+  {
+    "type": "paragraph",
+    "question": "Apart from John and Judas, name one disciple of Jesus that begins with letter J",
+    "answer": "James"
+  },
+  {
+    "type": "mcq",
+    "question": "Bernice can be connected with who?",
+    "options": [
+      "King Puri",
+      "King Agrippa",
+      "King Asa",
+      "King Festus"
+    ],
+    "answer": "King Agrippa"
+  },
+  {
+    "type": "mcq",
+    "question": "Out of his belly shall flow rivers of living water. Who spoke these words?",
+    "options": [
+      "Paul",
+      "Prophet Isaiah",
+      "Jesus",
+      "Ezekiel"
+    ],
+    "answer": "Jesus"
+  },
+  {
+    "type": "mcq",
+    "question": "How many human couples entered Noah's ark?",
+    "options": [
+      "4 couples",
+      "1 couple",
+      "6 couples",
+      "3 couples"
+    ],
+    "answer": "4 couples"
+  },
+  {
+    "type": "mcq",
+    "question": "What prophet was lifted between earth and heaven by a lock of his hair?",
+    "options": [
+      "Daniel",
+      "Ezekiel",
+      "Joel",
+      "Elisha"
+    ],
+    "answer": "Ezekiel"
+  },
+  {
+    "type": "mcq",
+    "question": "What woman in the New Testament continued in prayer day and night in the temple?",
+    "options": [
+      "Priscilla",
+      "Mary",
+      "Anna",
+      "Lydia"
+    ],
+    "answer": "Anna"
+  },
+  {
+    "type": "mcq",
+    "question": "What was the name of the wife of Joseph (son of Jacob)?",
+    "options": [
+      "Potiphera",
+      "Zipporah",
+      "Keturah",
+      "Asenath"
+    ],
+    "answer": "Asenath"
+  },
+  {
+    "type": "mcq",
+    "question": "Who was the cupbearer to King Artaxerxes?",
+    "options": [
+      "Meshach",
+      "Nehemiah",
+      "Azariah",
+      "Ezra"
+    ],
+    "answer": "Nehemiah"
+  },
+  {
+    "type": "mcq",
+    "question": "What was the name of the servant who had his ear cut off during Jesus\u2019 arrest?",
+    "options": [
+      "Titus",
+      "Archipus",
+      "Malchus",
+      "Claudia"
+    ],
+    "answer": "Malchus"
+  },
+  {
+    "type": "mcq",
+    "question": "What city did Paul escape in a basket lowered from the wall?",
+    "options": [
+      "Tropas",
+      "Antioch",
+      "Malta",
+      "Damascus"
+    ],
+    "answer": "Damascus"
+  },
+  {
+    "type": "mcq",
+    "question": "Who wrote, 'Vanity of vanities, all is vanity'?",
+    "options": [
+      "Job",
+      "Solomon",
+      "David",
+      "Ezekiel"
+    ],
+    "answer": "Solomon"
+  },
+  {
+    "type": "mcq",
+    "question": "Who received two talents of silver and two sets of clothing from Naaman?",
+    "options": [
+      "Elisha",
+      "Phinehas",
+      "Gehazi",
+      "Elijah"
+    ],
+    "answer": "Gehazi"
+  },
+  {
+    "type": "mcq",
+    "question": "Ezekiel ate the scroll. What did the scroll taste like?",
+    "options": [
+      "Sour as lemon",
+      "Sweet as honey",
+      "Bitter as bile",
+      "Hot and spicy"
+    ],
+    "answer": "Sweet as honey"
+  },
+  {
+    "type": "mcq",
+    "question": "As recorded in the Bible, who had 70 sons?",
+    "options": [
+      "Adam",
+      "Lamech",
+      "Gideon",
+      "David"
+    ],
+    "answer": "Gideon"
+  },
+  {
+    "type": "mcq",
+    "question": "Who killed 30 men, just to get their garments?",
+    "options": [
+      "David",
+      "Ahab",
+      "Samson",
+      "Joab"
+    ],
+    "answer": "Samson"
+  },
+  {
+    "type": "mcq",
+    "question": "To what did Jesus compare his disciples?",
+    "options": [
+      "Peppers",
+      "Mint",
+      "Salt",
+      "Cinnamon"
+    ],
+    "answer": "Salt"
+  },
+  {
+    "type": "mcq",
+    "question": "Who sacrificed his own daughter because of his vow?",
+    "options": [
+      "Saul",
+      "Jehu",
+      "Shimei",
+      "Jephthah"
+    ],
+    "answer": "Jephthah"
+  },
+  {
+    "type": "mcq",
+    "question": "A parable speaks of a woman who swept her entire house to find just one of how many silver coins?",
+    "options": [
+      "7",
+      "10",
+      "20",
+      "25"
+    ],
+    "answer": "10"
+  },
+  {
+    "type": "mcq",
+    "question": "Which city did Jonah flee towards to escape from the presence of the LORD?",
+    "options": [
+      "Tarshish",
+      "Damascus",
+      "Ekron",
+      "Tarsus"
+    ],
+    "answer": "Tarshish"
+  },
+  {
+    "type": "mcq",
+    "question": "What seed did Manna look like?",
+    "options": [
+      "Mustard",
+      "Barley",
+      "Coriander",
+      "Rice"
+    ],
+    "answer": "Coriander"
+  },
+  {
+    "type": "mcq",
+    "question": "Which one of his 10 brothers did Joseph hold captive when they returned after their first trip to Egypt?",
+    "options": [
+      "Asher",
+      "Reuben",
+      "Judah",
+      "Simeon"
+    ],
+    "answer": "Simeon"
+  },
+  {
+    "type": "mcq",
+    "question": "Which book has 50 chapters?",
+    "options": [
+      "Exodus",
+      "Genesis",
+      "Numbers",
+      "Leviticus"
+    ],
+    "answer": "Genesis"
+  },
+  {
+    "type": "mcq",
+    "question": "Whose son was Jonah?",
+    "options": [
+      "Hilkiah",
+      "Eliab",
+      "Amittai",
+      "Eleazar"
+    ],
+    "answer": "Amittai"
+  },
+  {
+    "type": "paragraph",
+    "question": "Sanctify them through thy ______: thy word is ______.",
+    "answer": "Truth"
+  },
+  {
+    "type": "paragraph",
+    "question": "Name Goliath’s place of origin as mentioned in 1 Samuel.",
+    "answer": "Gath"
+  },
+  {
+    "type": "mcq",
+    "question": "Who tied a scarlet cord in their window to ensure no harm would come to them when Israel attacked?",
+    "options": [
+      "Leah",
+      "Michal",
+      "Rahab",
+      "Abigail"
+    ],
+    "answer": "Rahab"
+  },
+  {
+    "type": "mcq",
+    "question": "Which gospel book's authorship is associated with a tax collector?",
+    "options": [
+      "Matthew",
+      "Mark",
+      "Luke",
+      "John"
+    ],
+    "answer": "Matthew"
+  },
+  {
+    "type": "mcq",
+    "question": "Who was Leah's servant?",
+    "options": [
+      "Bilhah",
+      "Abigail",
+      "Zilpah",
+      "Deborah"
+    ],
+    "answer": "Zilpah"
+  },
+  {
+    "type": "mcq",
+    "question": "Which brothers were known as 'Boanerges'?",
+    "options": [
+      "Judas and Bartholomew",
+      "Thomas and Philip",
+      "James and John",
+      "Peter and Andrew"
+    ],
+    "answer": "James and John"
+  },
+  {
+    "type": "mcq",
+    "question": "According to 1 John 1, who is God?",
+    "options": [
+      "Love",
+      "Light",
+      "Peace",
+      "Shelter"
+    ],
+    "answer": "Light"
+  },
+  {
+    "type": "mcq",
+    "question": "Who raised Tabitha (Dorcas) from the dead?",
+    "options": [
+      "James",
+      "Peter",
+      "Paul",
+      "Jesus"
+    ],
+    "answer": "Peter"
+  },
+  {
+    "type": "mcq",
+    "question": "How many chapters are there in the book of Matthew?",
+    "options": [
+      "31",
+      "29",
+      "28",
+      "17"
+    ],
+    "answer": "28"
+  },
+  {
+    "type": "mcq",
+    "question": "Jesus wept when Bartimaeus died.",
+    "options": [
+      "True",
+      "False"
+    ],
+    "answer": "False"
+  }
+]

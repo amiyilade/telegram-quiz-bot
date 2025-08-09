@@ -15,7 +15,7 @@ ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 BACKUP_ADMIN_IDS = [int(x.strip()) for x in os.getenv("BACKUP_ADMIN_IDS", "").split(",") if x.strip()]
 ALL_ADMIN_IDS = [ADMIN_ID] + BACKUP_ADMIN_IDS
 
-QUESTIONS_FILE = "tkh_questions.json"
+QUESTIONS_FILE = "tkh_quiz2.json"
 STATE_FILE = "game_states.pkl"
 
 # Global data structures
