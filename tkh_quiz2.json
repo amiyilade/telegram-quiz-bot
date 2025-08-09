@@ -552,7 +552,8 @@
       "Malta",
       "Damascus"
     ],
-    "answer": "Damascus"
+    "answer": "Damascus",
+    "is_tiebreaker": true
   },
   {
     "type": "mcq",
@@ -695,7 +696,8 @@
       "Amittai",
       "Eleazar"
     ],
-    "answer": "Amittai"
+    "answer": "Amittai",
+    "is_tiebreaker": true
   },
   {
     "type": "paragraph",
@@ -704,7 +706,7 @@
   },
   {
     "type": "paragraph",
-    "question": "Name Goliath’s place of origin as mentioned in 1 Samuel.",
+    "question": "Name Goliath's place of origin as mentioned in 1 Samuel.",
     "answer": "Gath"
   },
   {
@@ -727,7 +729,8 @@
       "Luke",
       "John"
     ],
-    "answer": "Matthew"
+    "answer": "Matthew",
+    "is_tiebreaker": true
   },
   {
     "type": "mcq",
@@ -760,7 +763,8 @@
       "Peace",
       "Shelter"
     ],
-    "answer": "Light"
+    "answer": "Light",
+    "is_tiebreaker": true
   },
   {
     "type": "mcq",
@@ -792,5 +796,11 @@
       "False"
     ],
     "answer": "False"
+  },
+  {
+    "type": "mcq",
+    "question": "What did God create on the fourth day according to Genesis?",
+    "options": ["Plants and trees", "Sun, moon, and stars", "Animals and birds", "The seas and dry land"],
+    "answer": "Sun, moon, and stars"
   }
 ]
