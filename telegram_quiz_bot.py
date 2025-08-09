@@ -161,11 +161,24 @@ question_pool = build_regular_question_pool()
 load_game_state()
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message:
+    if not update.message or not update.effective_user:
+        return
+    
+    # Only admins can use /start
+    if not is_admin(update.effective_user.id):
+        await update.message.reply_text("Only admins can start a new quiz session.")
         return
     
     chat_id = update.effective_chat.id
     game_state = get_game_state(chat_id)
+    
+    # Check if there's already an active session or players waiting
+    if (game_state["in_progress"] or 
+        game_state["tiebreaker_state"]["in_progress"] or 
+        game_state["active_players"]):
+        await update.message.reply_text("Cannot start a new quiz. There's already a game in progress or players waiting to start. Use /stop first if you need to reset.")
+        return
+    
     game_state["game_started"] = True  # Mark that /start has been called
     save_game_state()
     
@@ -697,11 +710,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Handle additional responses from users who already answered paragraph questions
     if (game_state["review_state"]["awaiting_admin_review"] and 
-        update.effective_user.id == game_state["review_state"]["responding_user_id"]):
+        update.effective_user.id == game_state["review_state"]["responding_user_id"] and
+        update.effective_user.id in game_state["active_players"]):  # Only if still active
         await context.bot.send_message(
             chat_id=chat_id,
             text=f"{update.effective_user.first_name}, only your first response is considered. Please wait for admin review."
         )
+        return
+
+    # Ignore messages from users who are not active players
+    if update.effective_user.id not in game_state["active_players"]:
         return
 
     # Handle wrong user trying to answer MCQ
@@ -1090,6 +1108,11 @@ async def remove_player(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"Player '{target}' not found.")
         return
 
+    # Check if this player was currently answering a question
+    was_current_player = (game_state["current_question_player"] == victim_id)
+    was_awaiting_review = (game_state["review_state"]["awaiting_admin_review"] and 
+                          game_state["review_state"]["responding_user_id"] == victim_id)
+
     # ---- actual removal ----
     game_state["active_players"].remove(victim_id)
     game_state["player_scores"].pop(victim_id, None)
@@ -1102,6 +1125,14 @@ async def remove_player(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Cancel any active timers
         if game_state["mcq_timer_task"] and not game_state["mcq_timer_task"].done():
             game_state["mcq_timer_task"].cancel()
+
+    # Clear review state if this player was awaiting review
+    if was_awaiting_review:
+        game_state["review_state"] = {
+            "awaiting_admin_review": False,
+            "responding_user_id": None,
+            "paragraph_answer": None
+        }
 
     # Adjust current_turn_index if necessary
     if victim_index < game_state["current_turn_index"]:
@@ -1122,12 +1153,16 @@ async def remove_player(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text=f"🚫 {user.first_name} has been removed from the quiz."
     )
 
+    # If the removed player was currently answering or awaiting review, move to next turn
+    if (game_state["in_progress"] and (was_current_player or was_awaiting_review)):
+        game_state["current_turn_index"] += 1
+        await next_turn(context, chat_id)
     # If game in progress and no one is currently answering a question, move to next turn
-    if (game_state["in_progress"] and 
-        not game_state["waiting_for_mcq_answer"] and 
-        not game_state["current_question_player"] and
-        not any(user_data.get("waiting_for_paragraph") for user_data in game_state["user_data"].values()) and
-        not game_state["review_state"]["awaiting_admin_review"]):
+    elif (game_state["in_progress"] and 
+          not game_state["waiting_for_mcq_answer"] and 
+          not game_state["current_question_player"] and
+          not any(user_data.get("waiting_for_paragraph") for user_data in game_state["user_data"].values()) and
+          not game_state["review_state"]["awaiting_admin_review"]):
         await next_turn(context, chat_id)
 
 if __name__ == "__main__":
