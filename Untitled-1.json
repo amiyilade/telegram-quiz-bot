@@ -1,0 +1,112 @@
+[
+  {
+    "type": "mcq",
+    "question": "Who led the Israelites out of Egypt?",
+    "options": [
+      "Moses",
+      "Abraham",
+      "David",
+      "Paul"
+    ],
+    "answer": "Moses"
+  },
+  {
+    "type": "mcq",
+    "question": "Test 1 (R)",
+    "options": [
+      "Q",
+      "R",
+      "S",
+      "T"
+    ],
+    "answer": "R"
+  },
+  {
+    "type": "paragraph",
+    "question": "Briefly explain the significance of the resurrection of Jesus.",
+    "answer": "open-ended"
+  },
+  {
+    "type": "mcq",
+    "question": "Who made the heavens?",
+    "options": [
+      "Moses",
+      "Abraham",
+      "God",
+      "Paul"
+    ],
+    "answer": "God"
+  },
+  {
+    "type": "mcq",
+    "question": "Who is Abraham's first wife?",
+    "options": [
+      "Hagar",
+      "Keturah",
+      "Sarah",
+      "Ruth"
+    ],
+    "answer": "Sarah"
+  },
+  {
+    "type": "paragraph",
+    "question": "Test A",
+    "answer": "open-ended",
+    "is_tiebreaker": true
+  },
+  {
+    "type": "paragraph",
+    "question": "Test B",
+    "answer": "open-ended",
+    "is_tiebreaker": true
+  },
+  {
+    "type": "paragraph",
+    "question": "Test C",
+    "answer": "open-ended",
+    "is_tiebreaker": true
+  },
+  {
+    "type": "paragraph",
+    "question": "Test D",
+    "answer": "open-ended",
+    "is_tiebreaker": true
+  },
+
+  {
+    "type": "mcq",
+    "question": "Test 2 (V)",
+    "options": [
+      "U",
+      "V",
+      "W",
+      "X"
+    ],
+    "answer": "V",
+    "is_tiebreaker": true
+  },
+  {
+    "type": "mcq",
+    "question": "Test 3 (Z)",
+    "options": [
+      "Y",
+      "Z",
+      "A",
+      "B"
+    ],
+    "answer": "Z",
+    "is_tiebreaker": true
+  },
+  {
+    "type": "mcq",
+    "question": "Test 4 (L)",
+    "options": [
+      "C",
+      "L",
+      "E",
+      "F"
+    ],
+    "answer": "L",
+    "is_tiebreaker": true
+  }
+]
