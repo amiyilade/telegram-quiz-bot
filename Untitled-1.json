@@ -11,17 +11,6 @@
     "answer": "Moses"
   },
   {
-    "type": "mcq",
-    "question": "Test 1 (R)",
-    "options": [
-      "Q",
-      "R",
-      "S",
-      "T"
-    ],
-    "answer": "R"
-  },
-  {
     "type": "paragraph",
     "question": "Briefly explain the significance of the resurrection of Jesus.",
     "answer": "open-ended"
